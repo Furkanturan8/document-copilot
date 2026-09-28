@@ -67,7 +67,7 @@ Goal: analysts can sign in with email; backend rejects unauthenticated requests.
 
 **Frontend**
 
-- [] Scaffold Vite + React + TypeScript + Tailwind + shadcn ([frontend-setup](guides/frontend-setup.md))
+- [X] Scaffold Vite + React + TypeScript + Tailwind + shadcn ([frontend-setup](guides/frontend-setup.md))
 - [] `src/lib/env.ts` — validate `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - [] `src/lib/supabase.ts` — browser Supabase client
 - [] `src/lib/http.ts` + `src/lib/api.ts` — fetch wrapper with automatic bearer token
