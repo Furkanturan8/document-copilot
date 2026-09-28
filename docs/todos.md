@@ -95,7 +95,7 @@ Goal: end-to-end chat UI streaming from FastAPI, no real retrieval yet.
 - [X] AI SDK chat primitives pointed at `POST /chat/stream` with Supabase bearer token
 - [X] Thread sidebar (past conversations)
 - [X] Basic message list + input + streaming indicator
-- [] Verify: create thread, send message, see streamed stub response, reload and see history
+- [X] Verify: create thread, send message, see streamed stub response, reload and see history
 
 ---
 
@@ -104,6 +104,7 @@ Goal: end-to-end chat UI streaming from FastAPI, no real retrieval yet.
 Goal: SEC filings in the corpus are parsed, chunked, embedded, and stored in Supabase.
 
 - [] `ingest/` scripts (or CLI entrypoint) for one-off corpus loading
+  - [X] `data/convert_to_markdown.py` — Docling HTML → Markdown for all filings into `data/markdown/<year>/` (run: `cd backend && uv run python ../data/convert_to_markdown.py`)
 - [] HTML → normalized Markdown extraction (preserve page/section metadata)
 - [] Chunking strategy (size + overlap; store chunk index, page, section, ticker, filing type, year)
 - [] Write `source_documents` rows with filing metadata from `manifest.json`
