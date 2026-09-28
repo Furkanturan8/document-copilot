@@ -103,22 +103,22 @@ Goal: end-to-end chat UI streaming from FastAPI, no real retrieval yet.
 
 Goal: SEC filings in the corpus are parsed, chunked, embedded, and stored in Supabase.
 
-- [] `ingest/` scripts (or CLI entrypoint) for one-off corpus loading
+- [X] `ingest/` scripts (or CLI entrypoint) for one-off corpus loading
   - [X] `data/convert_to_markdown.py` — Docling HTML → Markdown for all filings into `data/markdown/<year>/` (run: `cd backend && uv run python ../data/convert_to_markdown.py`)
   - [X] `ingest/load_source_documents.py` — source stage: registers `source_documents` (metadata + Docling Markdown) in Supabase (run: `cd backend && uv run python -m ingest.load_source_documents`)
-  - [] Chunking stage: per document, one transaction writes `document_tables` + `document_chunks` (+ embeddings) together and sets `ingested_at` last, so derived artifacts are always replaced as a unit
-- [] HTML → normalized Markdown extraction (preserve page/section metadata)
+  - [X] Chunking stage (`ingest/chunk_and_embed.py`): per document, one transaction writes `document_tables` + `document_chunks` (+ embeddings) together and sets `ingested_at` last, so derived artifacts are always replaced as a unit
+- [X] HTML → normalized Markdown extraction (preserve page/section metadata)
   - [X] Tables: Docling's Markdown tables repeat colspan cells and split `$`/`%` into their own cells, so tables are re-extracted from the raw HTML (`ingest/sec_tables.py`) into the new `document_tables` table (as in the reference). Tables are written by the chunking stage, not the source stage. `content_markdown` keeps the raw Docling output.
   - [X] Page / section metadata (improved over the reference, decided 2026-09-28): computed on the whole document before chunking. `page` = the next page footer after an item ("35", "35.", "Apple Inc. \| 2024 Form 10-K \| 35"), stored as "13-14" when a chunk crosses a page break; `section` = the last `Item N.` heading before it, with the canonical 10-K item title. Table-of-contents and index listings are ignored. Result: page 100%, section 98% of chunks (was ~0% / ~13% with the reference logic).
 - [X] Chunking strategy (size + overlap; store chunk index, page, section, ticker, filing type, year) — `ingest/chunking.py`: Docling HybridChunker (512 tokens, cl100k_base) for narrative text; one `table_row` chunk per clean table row (title + units + header + row). Improved over the reference (2026-09-28): Docling tables are matched to the clean tables up front and serialized as markers, so table rows land where the table was and no Docling grid is indexed twice; layout tables become plain text. Dry run: 17,031 chunks (≈2.6M tokens) for 25 filings, 0 narrative chunks with a Docling table grid (was ~60% of narrative chunks).
 - [X] Write `source_documents` rows with filing metadata from `manifest.json`
-- [] Write `document_chunks` rows with text + metadata
-- [] OpenAI embedding generation → store `vector(1536)` per chunk
-- [] Generated `tsvector` populated for full-text search
-- [] Idempotent re-run (skip already-ingested documents)
+- [X] Write `document_chunks` rows with text + metadata
+- [X] OpenAI embedding generation → store `vector(1536)` per chunk
+- [X] Generated `tsvector` populated for full-text search (11 chunks are signature underscores with an empty tsvector)
+- [X] Idempotent re-run (skip already-ingested documents) — verified: second `--all` run skipped 25/25
 - [X] Unit tests: chunking logic, metadata extraction (`tests/ingest/`)
-- [] Run ingestion on full sample corpus (25 filings × 5 companies)
-- [] Verify: chunks exist in Supabase; spot-check a known passage (e.g. Apple revenue mix table)
+- [X] Run ingestion on full sample corpus (25 filings × 5 companies) — 25 documents, 16,507 chunks (4,201 narrative + 12,306 table rows), 1,407 tables
+- [X] Verify: chunks exist in Supabase; spot-check a known passage (e.g. Apple revenue mix table) — found on p.23, Item 7
 
 ---
 

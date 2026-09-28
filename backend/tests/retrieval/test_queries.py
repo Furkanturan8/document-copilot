@@ -36,7 +36,8 @@ def test_filters_are_anded_and_bound_as_parameters():
 
 def test_semantic_sql_orders_by_cosine_distance():
     sql = semantic_sql(" AND sd.ticker = :ticker")
-    assert "ORDER BY dc.embedding <=> CAST(:query_vec AS vector)" in sql
+    assert "dc.embedding <=> CAST(:query_vec AS vector) AS distance" in sql
+    assert "ORDER BY distance + 0" in sql  # forces the re-sort after a relaxed iterative scan
     assert "WHERE dc.embedding IS NOT NULL AND sd.ticker = :ticker" in sql
 
 
@@ -51,7 +52,8 @@ def test_semantic_search_sends_vector_literal_and_ranks_from_one():
     session = RecordingSession([SimpleNamespace(id=first, score=0.9), SimpleNamespace(id=second, score=0.5)])
     hits = semantic_search(session, [0.1, 0.2], limit=5, filters=SearchFilters(ticker="NVDA"))
 
-    _, params = session.calls[0]
+    (settings_sql, settings_params), (_, params) = session.calls
+    assert "hnsw.iterative_scan" in settings_sql and settings_params == {"ef_search": 40}
     assert params["query_vec"] == "[0.1,0.2]"
     assert params["limit"] == 5 and params["ticker"] == "NVDA"
     assert [(hit.chunk_id, hit.rank) for hit in hits] == [(first, 1), (second, 2)]

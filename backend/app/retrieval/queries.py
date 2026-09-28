@@ -32,14 +32,30 @@ def build_filters(filters: SearchFilters | None) -> FilterClause:
 
 def semantic_sql(filter_sql: str) -> str:
     # <=> is pgvector's cosine distance, which the HNSW index is built for; similarity = 1 - distance.
+    # Iterative scans may return candidates slightly out of order, so the materialized CTE
+    # collects them and the outer query re-sorts. "+ 0" matters: without it Postgres trusts the
+    # CTE's ORDER BY and skips the sort (as the pgvector docs recommend).
     return f"""
-        SELECT dc.id, 1 - (dc.embedding <=> CAST(:query_vec AS vector)) AS score
-        FROM document_chunks dc
-        JOIN source_documents sd ON sd.id = dc.document_id
-        WHERE dc.embedding IS NOT NULL{filter_sql}
-        ORDER BY dc.embedding <=> CAST(:query_vec AS vector)
-        LIMIT :limit
+        WITH candidates AS MATERIALIZED (
+            SELECT dc.id, dc.embedding <=> CAST(:query_vec AS vector) AS distance
+            FROM document_chunks dc
+            JOIN source_documents sd ON sd.id = dc.document_id
+            WHERE dc.embedding IS NOT NULL{filter_sql}
+            ORDER BY distance
+            LIMIT :limit
+        )
+        SELECT id, 1 - distance AS score FROM candidates ORDER BY distance + 0
     """
+
+
+# An HNSW scan stops after hnsw.ef_search (default 40) candidates and only then applies the
+# WHERE filters, so a ticker-filtered search could return 3 hits instead of 50. Iterative
+# scans (pgvector >= 0.8) keep walking the index until enough rows pass the filters.
+# set_config(..., true) is SET LOCAL: it lasts until the end of the current transaction.
+ITERATIVE_SCAN_SQL = """
+    SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true),
+           set_config('hnsw.ef_search', CAST(:ef_search AS text), true)
+"""
 
 
 def full_text_sql(filter_sql: str) -> str:
@@ -63,6 +79,7 @@ def semantic_search(
     session: Session, query_vec: list[float], *, limit: int, filters: SearchFilters | None = None
 ) -> list[RankedChunkHit]:
     clause = build_filters(filters)
+    session.execute(text(ITERATIVE_SCAN_SQL), {"ef_search": max(limit, 40)})
     params = {"query_vec": "[" + ",".join(map(str, query_vec)) + "]", "limit": limit, **clause.params}
     return _to_hits(session.execute(text(semantic_sql(clause.sql)), params).all())
 
