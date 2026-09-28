@@ -156,7 +156,22 @@ class SecTableSerializer(BaseTableSerializer):
     ) -> SerializationResult:
         index = self.table_refs.get(item.self_ref)
         text = TABLE_MARKER.format(index=index) if index is not None else layout_table_text(item)
+        # Docling also stores rich cell content as child items of the table. Marking them
+        # visited (as Docling's own table serializers do) keeps the chunker from emitting
+        # that cell text a second time as narrative.
+        visited = kwargs.get("visited")
+        if visited is not None:
+            visited.update(_descendant_refs(item, doc))
         return create_ser_result(text=text, span_source=item)
+
+
+def _descendant_refs(item: Any, doc: DoclingDocument) -> set[str]:
+    refs: set[str] = set()
+    for child_ref in item.children:
+        child = child_ref.resolve(doc)
+        refs.add(child.self_ref)
+        refs |= _descendant_refs(child, doc)
+    return refs
 
 
 class SecSerializerProvider(ChunkingSerializerProvider):
@@ -251,8 +266,14 @@ def document_positions(doc: DoclingDocument, table_refs: dict[str, int]) -> tupl
     count upwards, which keeps stray numbers in the text from being taken for one.
     """
     items: list[tuple[str, list[str], bool]] = []  # ref, lines, is a text item
+    # Cell content Docling keeps as child items of a table: its text is already covered by
+    # the table itself, and its page numbers and "Item N." cells belong to tables of contents.
+    table_of: dict[str, str] = {}
     for item, _ in doc.iterate_items():
+        if item.self_ref in table_of:
+            continue
         if isinstance(item, TableItem):
+            table_of |= dict.fromkeys(_descendant_refs(item, doc), item.self_ref)
             lines = [] if item.self_ref in table_refs else layout_table_text(item).splitlines()
             items.append((item.self_ref, lines, False))
         elif isinstance(item, TextItem):
@@ -301,6 +322,8 @@ def document_positions(doc: DoclingDocument, table_refs: dict[str, int]) -> tupl
         section = headings.get(position, section)
         page = pages[position]
         positions[ref] = Position(str(page) if page is not None else None, section)
+    for ref, table_ref in table_of.items():
+        positions[ref] = positions[table_ref]
     return positions, footers
 
 

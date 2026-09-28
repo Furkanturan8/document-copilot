@@ -36,11 +36,12 @@ class DocumentChunk(UUIDPrimaryKey, CreatedAt, Base):
     page: Mapped[str | None]
     content: Mapped[str]
     token_count: Mapped[int]
+    # Deferred: ~20 KB per row and only needed by the vector search SQL itself.
     embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(settings.openai_embedding_dimensions)
+        Vector(settings.openai_embedding_dimensions), deferred=True
     )
     search_vector: Mapped[str] = mapped_column(
-        TSVECTOR, Computed("to_tsvector('english', content)", persisted=True)
+        TSVECTOR, Computed("to_tsvector('english', content)", persisted=True), deferred=True
     )
     # "metadata" is reserved on declarative classes, hence the attribute rename.
     metadata_: Mapped[dict[str, Any]] = mapped_column(

@@ -20,6 +20,7 @@ class SourceDocument(UUIDPrimaryKey, CreatedAt, UpdatedAt, Base):
     accession_number: Mapped[str] = mapped_column(unique=True)
     primary_document: Mapped[str]
     source_url: Mapped[str]
-    content_markdown: Mapped[str | None]
+    # Deferred: up to ~1 MB per filing, so it loads only when explicitly accessed.
+    content_markdown: Mapped[str | None] = mapped_column(deferred=True)
     # Set only after all chunks and embeddings are written; re-runs skip documents where it is set.
     ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

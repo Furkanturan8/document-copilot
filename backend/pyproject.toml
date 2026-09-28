@@ -34,6 +34,8 @@ exclude-newer = "7 days"
 # `ingest` is a top-level package next to `app` but not part of the installed wheel.
 pythonpath = ["."]
 testpaths = ["tests"]
+# The fast suite stays offline; run live tests with `pytest -m integration`.
+addopts = "-m 'not integration'"
 markers = [
     "integration: tests that require live Supabase and OpenAI credentials",
 ]

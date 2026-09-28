@@ -126,13 +126,13 @@ Goal: SEC filings in the corpus are parsed, chunked, embedded, and stored in Sup
 
 Goal: a user question returns ranked, relevant source passages.
 
-- [] `retrieval/queries.py` — pgvector semantic search over `document_chunks`
-- [] `retrieval/queries.py` — Postgres full-text search over `search_vector`
-- [] `retrieval/fusion.py` — Reciprocal Rank Fusion in Python
-- [] `retrieval/retriever.py` — query → fused ranked passages + neighbor chunks
-- [] Unit tests: fusion ranking, query assembly (mock DB)
-- [] Integration test (optional, `@pytest.mark.integration`): real query against ingested corpus
-- [] Verify: test queries from [client-brief](client-brief.md) return relevant chunks (manual or scripted)
+- [X] `retrieval/queries.py` — pgvector semantic search over `document_chunks`
+- [X] `retrieval/queries.py` — Postgres full-text search over `search_vector` (keywords from `retrieval/keywords.py`: a small model picks ≤5 words, since `plainto_tsquery` ANDs every word)
+- [X] `retrieval/fusion.py` — Reciprocal Rank Fusion in Python
+- [X] `retrieval/retriever.py` — query → fused ranked passages + neighbor chunks (neighbors fetched in one query, not one per hit)
+- [X] Unit tests: fusion ranking, query assembly (mock DB) — `tests/retrieval/`
+- [X] Integration test (optional, `@pytest.mark.integration`): real query against ingested corpus — run with `uv run pytest -m integration`
+- [] Verify: test queries from [client-brief](client-brief.md) return relevant chunks (manual or scripted) — `uv run python -m scripts.smoke_retrieval`, after the full corpus is ingested
 
 ---
 
