@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -21,8 +21,16 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 class ThreadResponse(BaseModel):
     id: uuid.UUID
     title: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class ThreadListResponse(BaseModel):
+    threads: list[ThreadResponse]
+
+
+class MessageHistoryResponse(BaseModel):
+    messages: list[UIMessage]
 
 
 class CreateThreadRequest(BaseModel):
@@ -30,11 +38,10 @@ class CreateThreadRequest(BaseModel):
 
 
 class ChatStreamRequest(BaseModel):
-    """Body sent by the AI SDK's DefaultChatTransport; `id` is the chat id, i.e. our thread id."""
+    """Body built by the frontend's chat transport: the thread plus the AI SDK UIMessages."""
 
-    id: uuid.UUID
+    thread_id: uuid.UUID = Field(validation_alias="threadId")
     messages: list[UIMessage] = Field(min_length=1)
-    trigger: Literal["submit-message", "regenerate-message"] = "submit-message"
 
 
 async def get_user_client(user: CurrentUserDep) -> AsyncClient:
@@ -54,9 +61,9 @@ async def require_thread(request: Request, thread_id: uuid.UUID, user: CurrentUs
 
 
 @router.get("/threads")
-async def list_threads(user: CurrentUserDep, client: UserClientDep) -> list[ThreadResponse]:
+async def list_threads(user: CurrentUserDep, client: UserClientDep) -> ThreadListResponse:
     rows = await chats.list_threads(client, user.id)
-    return [ThreadResponse.model_validate(row) for row in rows]
+    return ThreadListResponse(threads=[ThreadResponse.model_validate(row) for row in rows])
 
 
 @router.post("/threads", status_code=status.HTTP_201_CREATED)
@@ -72,19 +79,26 @@ async def create_thread(
 @router.get("/threads/{thread_id}/messages")
 async def list_messages(
     request: Request, thread_id: uuid.UUID, user: CurrentUserDep, client: UserClientDep
-) -> list[UIMessage]:
+) -> MessageHistoryResponse:
     await require_thread(request, thread_id, user)
-    return await chats.list_messages(client, thread_id)
+    return MessageHistoryResponse(messages=await chats.list_messages(client, thread_id))
+
+
+@router.delete("/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_thread(
+    request: Request, thread_id: uuid.UUID, user: CurrentUserDep, client: UserClientDep
+) -> None:
+    await require_thread(request, thread_id, user)
+    # Messages and citations go with it through ON DELETE CASCADE.
+    await chats.delete_thread(client, thread_id)
 
 
 @router.post("/stream")
 async def stream_chat(
     request: Request, body: ChatStreamRequest, user: CurrentUserDep, client: UserClientDep
 ) -> StreamingResponse:
-    thread = await require_thread(request, body.id, user)
+    thread = await require_thread(request, body.thread_id, user)
 
-    if body.trigger != "submit-message":
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Regenerating replies is not supported yet")
     # History comes from the database; only the newest message is taken from the request.
     user_message = body.messages[-1]
     if user_message.role != "user" or not message_text(user_message).strip():

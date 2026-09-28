@@ -80,7 +80,7 @@ backend/
 ## Anti-patterns (rejected)
 
 - `os.getenv` / `load_dotenv` in modules.
-- Wrapping FastAPI responses in custom envelope classes.
+- Wrapping FastAPI responses in generic envelope classes (`{"data": ..., "error": ..., "status": ...}`). List endpoints are the exception by design: they return an object with a named list field (`{"threads": [...]}`, `{"messages": [...]}`) so fields can be added without breaking clients (decision changed 2026-09-28, see `docs/architecture.md`).
 - Over-catching `Exception` just to log and re-raise; let it propagate.
 - Shared state through globals instead of FastAPI `app.state` or DI.
 - Silent fallbacks that hide real config errors.

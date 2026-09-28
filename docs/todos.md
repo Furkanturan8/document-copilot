@@ -87,6 +87,7 @@ Goal: end-to-end chat UI streaming from FastAPI, no real retrieval yet.
 - [X] `POST /chat/stream` — accepts AI SDK message format, streams a stubbed assistant reply
 - [X] Persist user + assistant messages to `chat_messages` after stream completes
 - [X] `403` when user accesses another user's thread
+- [X] `DELETE /chat/threads/{id}` — delete a thread (added 2026-09-28 to match the reference)
 
 **Frontend**
 

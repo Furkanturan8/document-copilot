@@ -266,7 +266,16 @@ Streaming responsibilities:
 - Send text deltas as the answer is generated.
 - Send citation/source metadata as structured parts once available.
 - Send clear error events for authentication failures, missing threads, retrieval failures, and grounding failures.
-- Persist only after the assistant run completes successfully, unless a separate partial-message model is deliberately introduced later.
+- Persist the turn once the assistant reply is fully generated, even if the client disconnects mid-stream: the complete reply exists before streaming starts, so the next history load can show it. The write is shielded from request cancellation. Never persist a partially generated reply, unless a separate partial-message model is deliberately introduced later. *(Decision changed 2026-09-28: previously "persist only after the assistant run completes successfully", which dropped fully generated replies when the client disconnected.)*
+
+Thread endpoints (all under `/chat`, all require the bearer token):
+
+- `GET /chat/threads` → `{"threads": [...]}`
+- `POST /chat/threads` → the created thread
+- `GET /chat/threads/{threadId}/messages` → `{"messages": [...]}` (AI SDK UI messages, in order)
+- `DELETE /chat/threads/{threadId}` → `204`; messages and citations are removed by `ON DELETE CASCADE`
+
+List responses are objects with a named list field rather than bare arrays, so fields can be added later without breaking clients. Thread fields use camelCase on the wire (`createdAt`, `updatedAt`). Another user's thread returns `403`, an unknown thread `404`. *(Decision changed 2026-09-28: bare-array list responses were replaced to match the reference implementation.)*
 
 ## Data Model
 

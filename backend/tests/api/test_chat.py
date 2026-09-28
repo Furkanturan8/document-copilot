@@ -17,8 +17,7 @@ THREAD = {"id": str(THREAD_ID), "user_id": str(OWNER.id), "title": "New chat"}
 
 def stream_body(role: str = "user", text: str = "What was Apple's revenue?") -> dict:
     return {
-        "id": str(THREAD_ID),
-        "trigger": "submit-message",
+        "threadId": str(THREAD_ID),
         "messages": [{"id": "client-1", "role": role, "parts": [{"type": "text", "text": text}]}],
     }
 
@@ -36,8 +35,12 @@ def client_as(monkeypatch):
     async def fake_append_turn(_client, thread, user_message, assistant_message):
         persisted.append((thread, user_message, assistant_message))
 
+    async def fake_delete_thread(_client, thread_id):
+        persisted.append(("deleted", thread_id))
+
     monkeypatch.setattr(chat_api.chats, "get_thread", fake_get_thread)
     monkeypatch.setattr(chat_api.chats, "list_messages", fake_list_messages)
+    monkeypatch.setattr(chat_api.chats, "delete_thread", fake_delete_thread)
     monkeypatch.setattr("app.chat.orchestrator.chats.append_turn", fake_append_turn)
     monkeypatch.setattr("app.chat.orchestrator.STUB_DELAY_SECONDS", 0)
     monkeypatch.setattr(app.state, "supabase", SimpleNamespace(), raising=False)
@@ -94,3 +97,23 @@ def test_stream_emits_ai_sdk_protocol_and_persists_turn(client_as):
     assert user_message.parts[0]["text"] == "What was Apple's revenue?"
     assert assistant_message.parts[0]["text"] == streamed
     assert assistant_message.id == chunks[0]["messageId"]
+
+
+def test_history_is_wrapped_in_messages_object(client_as):
+    response = client_as(OWNER).get(f"/chat/threads/{THREAD_ID}/messages")
+    assert response.status_code == 200
+    assert response.json() == {"messages": []}
+
+
+def test_owner_can_delete_thread(client_as):
+    client = client_as(OWNER)
+    response = client.delete(f"/chat/threads/{THREAD_ID}")
+    assert response.status_code == 204
+    assert client.persisted == [("deleted", THREAD_ID)]
+
+
+def test_other_user_cannot_delete_thread(client_as):
+    client = client_as(OTHER)
+    response = client.delete(f"/chat/threads/{THREAD_ID}")
+    assert response.status_code == 403
+    assert client.persisted == []

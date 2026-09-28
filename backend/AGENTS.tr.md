@@ -82,7 +82,7 @@ backend/
 ## Anti-pattern'ler (reddedilir)
 
 - Modüllerde `os.getenv` / `load_dotenv`.
-- FastAPI yanıtlarını özel zarf (envelope) sınıflarına sarmak.
+- FastAPI yanıtlarını genel zarf (envelope) sınıflarına sarmak (`{"data": ..., "error": ..., "status": ...}`). Liste endpoint'leri bilinçli bir istisnadır: istemcileri bozmadan alan eklenebilmesi için adlandırılmış bir liste alanı olan nesne dönerler (`{"threads": [...]}`, `{"messages": [...]}`) (karar 2026-09-28'de değişti, bkz. `docs/architecture.md`).
 - Sadece loglayıp yeniden fırlatmak için `Exception`'ı fazla geniş yakalamak; bırak yayılsın.
 - FastAPI `app.state` veya DI yerine global'ler üzerinden paylaşılan durum.
 - Gerçek konfigürasyon hatalarını gizleyen sessiz geri dönüşler.

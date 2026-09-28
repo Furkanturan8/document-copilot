@@ -268,7 +268,16 @@ Streaming sorumlulukları:
 - Yanıt üretildikçe metin parçalarını (delta) gönder.
 - Alıntı/kaynak metadata'sını hazır olduğunda yapılandırılmış parçalar olarak gönder.
 - Kimlik doğrulama hataları, eksik thread'ler, retrieval hataları ve grounding hataları için net hata olayları gönder.
-- Daha sonra bilinçli olarak ayrı bir kısmi mesaj modeli eklenmedikçe, yalnızca asistan çalıştırması başarıyla tamamlandıktan sonra kaydet.
+- Asistan cevabı tamamen üretildikten sonra turu kaydet; istemci stream'in ortasında bağlantıyı kesse bile. Cevabın tamamı stream başlamadan önce hazır olduğu için, bir sonraki geçmiş yüklemesinde gösterilebilir. Kayıt işlemi istek iptaline karşı korunur (shield). Daha sonra bilinçli olarak ayrı bir kısmi mesaj modeli eklenmedikçe, yarım üretilmiş bir cevabı asla kaydetme. *(Karar 2026-09-28'de değişti: önceki kural "yalnızca asistan çalıştırması başarıyla tamamlandıktan sonra kaydet" idi; bu, istemci bağlantıyı kestiğinde tamamen üretilmiş cevapların kaybolmasına yol açıyordu.)*
+
+Thread endpoint'leri (hepsi `/chat` altında, hepsi bearer token gerektirir):
+
+- `GET /chat/threads` → `{"threads": [...]}`
+- `POST /chat/threads` → oluşturulan thread
+- `GET /chat/threads/{threadId}/messages` → `{"messages": [...]}` (sıralı AI SDK UI mesajları)
+- `DELETE /chat/threads/{threadId}` → `204`; mesajlar ve alıntılar `ON DELETE CASCADE` ile silinir
+
+Liste yanıtları çıplak dizi yerine adlandırılmış bir liste alanı olan nesnelerdir; böylece ileride istemcileri bozmadan alan eklenebilir. Thread alanları API'de camelCase'dir (`createdAt`, `updatedAt`). Başka bir kullanıcının thread'i `403`, bilinmeyen bir thread `404` döner. *(Karar 2026-09-28'de değişti: referans implementasyonla uyum için çıplak dizi dönen liste yanıtlarının yerine bu yapı geldi.)*
 
 ## Veri Modeli
 

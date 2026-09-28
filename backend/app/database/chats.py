@@ -48,6 +48,10 @@ async def create_thread(client: AsyncClient, user_id: uuid.UUID, title: str | No
     return response.data[0]
 
 
+async def delete_thread(client: AsyncClient, thread_id: uuid.UUID) -> None:
+    await client.table("chat_threads").delete().eq("id", str(thread_id)).execute()
+
+
 async def list_messages(client: AsyncClient, thread_id: uuid.UUID) -> list[UIMessage]:
     response = await (
         client.table("chat_messages")
