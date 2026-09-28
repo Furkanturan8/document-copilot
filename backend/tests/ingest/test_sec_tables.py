@@ -115,6 +115,32 @@ def test_layout_tables_are_skipped():
     assert extract_sec_tables(html(prose, exhibits, contents)) == []
 
 
+def test_title_skips_page_furniture_and_units_lines():
+    table = """
+    <table>
+      <tr><td/><td>2024</td><td>2023</td></tr>
+      <tr><td>Total net sales</td><td>$391,035</td><td>$383,285</td></tr>
+    </table>"""
+    [result] = extract_sec_tables(
+        html(
+            "<div>CONSOLIDATED STATEMENTS OF OPERATIONS</div>",
+            "<div>(In millions, except per-share amounts)</div>",
+            "<div>Apple Inc. | 2024 Form 10-K | 28</div>",
+            "<div>Table of Contents</div>",
+            table,
+        )
+    )
+    assert result.title == "CONSOLIDATED STATEMENTS OF OPERATIONS"
+    assert result.units == "In millions, except per-share amounts"
+
+
+def test_table_right_after_another_inherits_its_title():
+    first = NET_SALES
+    continuation = "<table><tr><td/><td>2022</td></tr><tr><td>Services</td><td>$78,129</td></tr></table>"
+    tables = extract_sec_tables(html(first, continuation))
+    assert tables[1].title == tables[0].title
+
+
 def test_tables_are_indexed_in_document_order():
     tables = extract_sec_tables(html(NET_SALES, NET_SALES.replace("iPhone", "iPad")))
     assert [table.table_index for table in tables] == [0, 1]

@@ -132,7 +132,7 @@ Goal: a user question returns ranked, relevant source passages.
 - [X] `retrieval/retriever.py` — query → fused ranked passages + neighbor chunks (neighbors fetched in one query, not one per hit)
 - [X] Unit tests: fusion ranking, query assembly (mock DB) — `tests/retrieval/`
 - [X] Integration test (optional, `@pytest.mark.integration`): real query against ingested corpus — run with `uv run pytest -m integration`
-- [] Verify: test queries from [client-brief](client-brief.md) return relevant chunks (manual or scripted) — `uv run python -m scripts.smoke_retrieval`, after the full corpus is ingested
+- [X] Verify: test queries from [client-brief](client-brief.md) return relevant chunks (manual or scripted) — `uv run python -m scripts.smoke_retrieval`: 10/10 questions return 10 passages from the right company, section and years. Weak spots left for the agent (Phase 6) to compensate with follow-up searches: the Apple revenue-mix question ranks the table footnotes above the net-sales table rows, and the Microsoft capex question surfaces tax/debt passages.
 
 ---
 

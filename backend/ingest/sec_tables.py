@@ -25,6 +25,21 @@ VALUE_RE = re.compile(rf"^{_AMOUNT}(?:\s*[–-]\s*{_AMOUNT})?$|^[—–-]+$")
 YEAR_RE = re.compile(r"^(?:19|20)\d{2}$")
 UNITS_RE = re.compile(r"\bin (?:millions|thousands|billions)\b(?:, except [^)]*)?", re.IGNORECASE)
 TITLE_MAX_LENGTH = 300
+TITLE_LOOKBACK_BLOCKS = 4
+# Page furniture and labels found right above tables; the title is the nearest block that is
+# none of these (units lines still feed `units`).
+NON_TITLE_RES = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"^table of contents\b",  # running header
+        r"^\d{1,3}\.?$",  # page footer: "35", "35."
+        r"\|\s*\d{4} Form 10-K\s*\|\s*\d{1,3}$",  # page footer: "Apple Inc. | 2024 Form 10-K | 35"
+        r"^\(?(?:dollars |amounts )?in (?:millions|thousands|billions)\b[^)]*\)?:?$",  # units line
+        r"^\(?continued\)?$",
+        r"^(?:part [ivx]+|item \d{1,2}[a-c]?)\.?$",  # bare section label
+        r"^[A-Z0-9 .,&-]*(?:CORPORATION|INC\.?|COMPANY)(?: AND SUBSIDIARIES)?$",  # company header
+    )
+)
 PROSE_CELL_LENGTH = 200
 
 
@@ -311,6 +326,11 @@ def _rows(table: _Node) -> list[_Node]:
     return found
 
 
+def _is_non_title(text: str) -> bool:
+    """Lines that sit right above a table but do not describe it."""
+    return any(pattern.search(text.strip()) for pattern in NON_TITLE_RES)
+
+
 def extract_sec_tables(html: str) -> list[ExtractedTable]:
     parser = _TreeParser()
     parser.feed(html)
@@ -320,10 +340,12 @@ def extract_sec_tables(html: str) -> list[ExtractedTable]:
     _collect_blocks(parser.root, blocks)
 
     tables: list[ExtractedTable] = []
-    last_text: str | None = None
+    # Text blocks since the previous extracted table; layout tables in between (spacers,
+    # running headers) do not reset it, as the title often sits above them.
+    recent_texts: list[str] = []
     for kind, block in blocks:
         if kind == "text":
-            last_text = block  # type: ignore[assignment]
+            recent_texts.append(block)  # type: ignore[arg-type]
             continue
         rows = [tokens for tokens in _grid_tokens(_rows(block)) if tokens]  # type: ignore[arg-type]
         if not rows or _is_layout_table(rows):
@@ -332,8 +354,12 @@ def extract_sec_tables(html: str) -> list[ExtractedTable]:
         if built is None or not _looks_like_financial_data(built[1]):
             continue
         headers, body = built
-        title = last_text[:TITLE_MAX_LENGTH] if last_text else None
-        units_match = UNITS_RE.search(" ".join(filter(None, [title, *headers])))
+        nearby, recent_texts = recent_texts[-TITLE_LOOKBACK_BLOCKS:], []
+        title = next((text[:TITLE_MAX_LENGTH] for text in reversed(nearby) if not _is_non_title(text)), None)
+        # A table right after another one, with no text in between, continues its topic.
+        if title is None and tables:
+            title = tables[-1].title
+        units_match = UNITS_RE.search(" ".join([*nearby, *headers]))
         units = units_match.group(0) if units_match else None
         raw_rows = [[token.text for token in tokens] for tokens in rows]
         tables.append(
