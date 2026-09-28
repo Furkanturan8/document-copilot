@@ -3,11 +3,6 @@ import { supabase } from '@/lib/supabase'
 
 type Options = Omit<RequestOptions, 'body' | 'accessToken'>
 
-export type CurrentUser = {
-  id: string
-  email: string
-}
-
 // Exported for callers that don't go through `api`, e.g. the AI SDK chat transport.
 export async function getAccessToken(): Promise<string | null> {
   // getSession refreshes an expired access token before returning it.
@@ -25,6 +20,4 @@ export const api = {
   put: <T>(path: string, body?: unknown, options?: Options) => withAuth<T>('PUT', path, { ...options, body }),
   patch: <T>(path: string, body?: unknown, options?: Options) => withAuth<T>('PATCH', path, { ...options, body }),
   delete: <T>(path: string, options?: Options) => withAuth<T>('DELETE', path, options),
-
-  getCurrentUser: () => withAuth<CurrentUser>('GET', '/auth/me'),
 }

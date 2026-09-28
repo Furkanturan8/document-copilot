@@ -8,7 +8,7 @@ export function LoginPage() {
   const { session, isLoading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/'
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/chats'
 
   if (isLoading) return null
   if (session) return <Navigate to={redirectTo} replace />
