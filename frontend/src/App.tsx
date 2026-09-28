@@ -4,11 +4,11 @@ import { AuthProvider } from '@/components/auth/AuthProvider'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
-import { SignUpPage } from '@/pages/SignUpPage'
+import { RequestAccessPage } from '@/pages/RequestAccessPage'
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
-  { path: '/signup', element: <SignUpPage /> },
+  { path: '/request-access', element: <RequestAccessPage /> },
   {
     element: <ProtectedRoute />,
     children: [{ path: '/', element: <HomePage /> }],

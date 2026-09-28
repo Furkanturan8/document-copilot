@@ -71,7 +71,7 @@ Goal: analysts can sign in with email; backend rejects unauthenticated requests.
 - [X] `src/lib/env.ts` — validate `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - [X] `src/lib/supabase.ts` — browser Supabase client
 - [X] `src/lib/http.ts` + `src/lib/api.ts` — fetch wrapper with automatic bearer token
-- [X] Sign-in / sign-up pages (email only, no SSO)
+- [X] Sign-in page (email only, no SSO) + request-access page — public sign-up is disabled in Supabase; admins create users in Dashboard → Authentication → Users → Add user (Auto Confirm)
 - [X] Protected routes — redirect unauthenticated users to login
 - [] Verify: sign up, sign in, token reaches backend on a test authenticated endpoint
 

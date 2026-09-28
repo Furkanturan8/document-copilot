@@ -9,20 +9,12 @@ type AuthFormProps = {
   title: string
   description: string
   submitLabel: string
-  passwordAutoComplete: 'current-password' | 'new-password'
   footer: ReactNode
   // Returns an error message to show, or nothing on success.
   onSubmit: (email: string, password: string) => Promise<string | void>
 }
 
-export function AuthForm({
-  title,
-  description,
-  submitLabel,
-  passwordAutoComplete,
-  footer,
-  onSubmit,
-}: AuthFormProps) {
+export function AuthForm({ title, description, submitLabel, footer, onSubmit }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -55,8 +47,7 @@ export function AuthForm({
                 id="password"
                 name="password"
                 type="password"
-                autoComplete={passwordAutoComplete}
-                minLength={6}
+                autoComplete="current-password"
                 required
               />
             </div>

@@ -24,13 +24,12 @@ export function LoginPage() {
       title="Sign in"
       description="Use your work email to access Document Copilot."
       submitLabel="Sign in"
-      passwordAutoComplete="current-password"
       onSubmit={signIn}
       footer={
         <>
           No account yet?{' '}
-          <Link to="/signup" className="underline underline-offset-4">
-            Sign up
+          <Link to="/request-access" className="underline underline-offset-4">
+            Request access
           </Link>
         </>
       }
