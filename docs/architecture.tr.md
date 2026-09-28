@@ -289,6 +289,7 @@ Supabase tabloları küçük ve ürün odaklı olmalıdır:
 - `message_citations`: asistan mesajlarına bağlı normalize edilmiş alıntı kayıtları.
 - `source_documents`: rapor metadata'sı, kaynak URL ve normalize edilmiş Markdown içeriği ile orijinal doküman kayıtları.
 - `document_chunks`: parça metni, parça metadata'sı, embedding'ler ve generated full-text search vektörleri.
+- `document_tables`: her raporun ham HTML'inden yeniden çıkarılan finansal tablolar (temiz Markdown, yapılandırılmış `table_data` JSON'u, başlık, birim), `table_index` ile doküman sırasında. Docling'in Markdown'u SEC HTML'inin düzen ızgarasını birebir yansıtır (tekrarlanan colspan hücreleri, ayrı hücrelerde `$`/`%`, boşluk sütunları); bu da tabloların güvenilir okunmasını zorlaştırır. Bu yüzden `content_markdown` ham Docling çıktısını tutar, temiz tablolar burada durur. *(2026-09-28'de referans implementasyona uygun olarak eklendi.)*
 
 `source_documents`, her raporun normalize edilmiş Markdown sürümünü saklar; böylece uygulama indirilen HTML dosyalarına geri dönmeden orijinal çıkarılmış metni yeniden parçalayabilir, inceleyebilir ve alıntılayabilir. `document_chunks` retrieval'a hazır pasajları saklar:
 

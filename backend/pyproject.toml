@@ -30,6 +30,8 @@ add-bounds = "exact"
 exclude-newer = "7 days"
 
 [tool.pytest.ini_options]
+# `ingest` is a top-level package next to `app` but not part of the installed wheel.
+pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "integration: tests that require live Supabase and OpenAI credentials",

@@ -105,9 +105,12 @@ Goal: SEC filings in the corpus are parsed, chunked, embedded, and stored in Sup
 
 - [] `ingest/` scripts (or CLI entrypoint) for one-off corpus loading
   - [X] `data/convert_to_markdown.py` — Docling HTML → Markdown for all filings into `data/markdown/<year>/` (run: `cd backend && uv run python ../data/convert_to_markdown.py`)
+  - [X] `ingest/load_source_documents.py` — `source_documents` + `document_tables` into Supabase (run: `cd backend && uv run python -m ingest.load_source_documents`)
 - [] HTML → normalized Markdown extraction (preserve page/section metadata)
+  - [X] Tables: Docling's Markdown tables repeat colspan cells and split `$`/`%` into their own cells, so tables are re-extracted from the raw HTML (`ingest/sec_tables.py`) into the new `document_tables` table (as in the reference). `content_markdown` keeps the raw Docling output.
+  - [] Page numbers (footer formats differ per company) and `Item` section headings — still to do, during chunking
 - [] Chunking strategy (size + overlap; store chunk index, page, section, ticker, filing type, year)
-- [] Write `source_documents` rows with filing metadata from `manifest.json`
+- [X] Write `source_documents` rows with filing metadata from `manifest.json`
 - [] Write `document_chunks` rows with text + metadata
 - [] OpenAI embedding generation → store `vector(1536)` per chunk
 - [] Generated `tsvector` populated for full-text search

@@ -287,6 +287,7 @@ Supabase tables should be small and product-oriented:
 - `message_citations`: normalized citation records linked to assistant messages.
 - `source_documents`: original document records with filing metadata, source URL, and normalized Markdown content.
 - `document_chunks`: chunk text, chunk metadata, embeddings, and generated full-text search vectors.
+- `document_tables`: financial tables re-extracted from each filing's raw HTML (clean Markdown, structured `table_data` JSON, title, units), in document order via `table_index`. Docling's Markdown mirrors the SEC HTML layout grid (repeated colspan cells, `$`/`%` in their own cells, spacer columns), which makes tables hard to read reliably, so `content_markdown` keeps the raw Docling output and clean tables live here. *(Added 2026-09-28, following the reference implementation.)*
 
 `source_documents` stores the normalized Markdown version of each filing so the application can re-chunk, inspect, and cite the original extracted text without reaching back into downloaded HTML files. `document_chunks` stores retrieval-ready passages:
 
