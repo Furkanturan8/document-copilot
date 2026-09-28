@@ -73,7 +73,7 @@ Goal: analysts can sign in with email; backend rejects unauthenticated requests.
 - [X] `src/lib/http.ts` + `src/lib/api.ts` — fetch wrapper with automatic bearer token
 - [X] Sign-in page (email only, no SSO) + request-access page — public sign-up is disabled in Supabase; admins create users in Dashboard → Authentication → Users → Add user (Auto Confirm)
 - [X] Protected routes — redirect unauthenticated users to login
-- [] Verify: sign up, sign in, token reaches backend on a test authenticated endpoint
+- [X] Verify: sign up, sign in, token reaches backend on a test authenticated endpoint
 
 ---
 
@@ -83,10 +83,10 @@ Goal: end-to-end chat UI streaming from FastAPI, no real retrieval yet.
 
 **Backend**
 
-- [] Chat thread CRUD: list threads, create thread, load message history
-- [] `POST /chat/stream` — accepts AI SDK message format, streams a stubbed assistant reply
-- [] Persist user + assistant messages to `chat_messages` after stream completes
-- [] `403` when user accesses another user's thread
+- [X] Chat thread CRUD: list threads, create thread, load message history
+- [X] `POST /chat/stream` — accepts AI SDK message format, streams a stubbed assistant reply
+- [X] Persist user + assistant messages to `chat_messages` after stream completes
+- [X] `403` when user accesses another user's thread
 
 **Frontend**
 
