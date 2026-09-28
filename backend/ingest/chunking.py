@@ -59,6 +59,7 @@ FOOTER_RES = (
     re.compile(r"\|\s*\d{4} Form 10-K\s*\|\s*(\d{1,3})$", re.IGNORECASE),
 )
 RUNNING_HEADER_RE = re.compile(r"^table of contents\b", re.IGNORECASE)
+MARKDOWN_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)\s]*\)")
 ITEM_HEADING_RE = re.compile(r"^\s*item\s+(\d{1,2}[a-c]?)\b", re.IGNORECASE)
 TOC_PAGE_SUFFIX_RE = re.compile(r"\s\d{1,3}$")
 HEADING_MAX_LENGTH = 200
@@ -347,6 +348,10 @@ def _dense_runs(positions: list[int], *, min_length: int, orders: dict[int, int]
 
 
 def clean_chunk_text(text: str, footers: set[str]) -> str:
+    # Docling keeps hyperlinks as Markdown; their targets (in-page anchors, EDGAR URLs) are
+    # noise for search, so only the link text stays. A "[Table of Contents](#...)" running
+    # header then becomes a plain "Table of Contents" line and is dropped with the others.
+    text = MARKDOWN_LINK_RE.sub(r"\1", text)
     return "\n".join(
         line
         for line in text.splitlines()

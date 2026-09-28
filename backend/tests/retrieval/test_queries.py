@@ -41,10 +41,12 @@ def test_semantic_sql_orders_by_cosine_distance():
     assert "WHERE dc.embedding IS NOT NULL AND sd.ticker = :ticker" in sql
 
 
-def test_full_text_sql_uses_plainto_tsquery_and_search_vector():
+def test_full_text_sql_ors_the_keywords_and_ranks_by_matched_terms():
     sql = full_text_sql("")
     assert "plainto_tsquery(CAST(:fts_config AS regconfig), :query_text)" in sql
-    assert "dc.search_vector @@ query" in sql
+    assert "'&', '|'" in sql  # any keyword matches, not only chunks holding all of them
+    assert "dc.search_vector @@ q.query" in sql
+    assert "ORDER BY matched_terms DESC, score DESC" in sql
 
 
 def test_semantic_search_sends_vector_literal_and_ranks_from_one():

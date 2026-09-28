@@ -107,6 +107,14 @@ def test_page_span_and_footer_cleanup():
     assert clean_chunk_text(text, {"Apple Inc. | 2024 Form 10-K | 35"}) == "Revenue grew.\nMargins held."
 
 
+def test_links_keep_only_their_text():
+    text = (
+        "[Table of Contents](#i7bfb_7)\n"
+        "See [Note 11 - Debt](#i7bfb_94) and [Exhibit 4.1](https://www.sec.gov/Archives/edgar/data/1/a.htm)."
+    )
+    assert clean_chunk_text(text, set()) == "See Note 11 - Debt and Exhibit 4.1."
+
+
 def test_base_metadata_copies_only_filing_fields():
     filing = {"ticker": "AAPL", "fiscal_year": 2024, "content_markdown": "huge"}
     metadata = base_chunk_metadata(filing)

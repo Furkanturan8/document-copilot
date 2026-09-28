@@ -59,14 +59,23 @@ ITERATIVE_SCAN_SQL = """
 
 
 def full_text_sql(filter_sql: str) -> str:
-    # plainto_tsquery ANDs every word, so the query text should be a few focused keywords.
+    # plainto_tsquery normalizes the keywords (stemming, stop words) but ANDs them, and five
+    # ANDed keywords matched nothing for 3 of 10 test questions. Its '&'s become '|' so any
+    # keyword matches; chunks matching more distinct keywords rank first, then ts_rank_cd.
     return f"""
-        SELECT dc.id, ts_rank_cd(dc.search_vector, query) AS score
+        WITH q AS (
+            SELECT CAST(replace(CAST(plainto_tsquery(CAST(:fts_config AS regconfig), :query_text) AS text),
+                                '&', '|') AS tsquery) AS query,
+                   tsvector_to_array(to_tsvector(CAST(:fts_config AS regconfig), :query_text)) AS terms
+        )
+        SELECT dc.id,
+               (SELECT count(*) FROM unnest(q.terms) AS term
+                WHERE dc.search_vector @@ CAST(quote_literal(term) AS tsquery)) AS matched_terms,
+               ts_rank_cd(dc.search_vector, q.query) AS score
         FROM document_chunks dc
-        JOIN source_documents sd ON sd.id = dc.document_id,
-             plainto_tsquery(CAST(:fts_config AS regconfig), :query_text) AS query
-        WHERE dc.search_vector @@ query{filter_sql}
-        ORDER BY score DESC
+        JOIN source_documents sd ON sd.id = dc.document_id, q
+        WHERE dc.search_vector @@ q.query{filter_sql}
+        ORDER BY matched_terms DESC, score DESC
         LIMIT :limit
     """
 

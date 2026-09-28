@@ -304,6 +304,13 @@ Supabase tables should be small and product-oriented:
 
 Hybrid retrieval runs two bounded queries against `document_chunks`: a semantic `pgvector` query and a Postgres full-text query. The backend fuses those ranked lists with Reciprocal Rank Fusion, then fetches the selected chunks and neighboring context for grounding.
 
+Two retrieval details differ from the reference implementation *(decided 2026-09-29, measured on the client-brief questions)*:
+
+- The semantic query enables pgvector's iterative index scan (`hnsw.iterative_scan = relaxed_order`) and re-sorts the candidates. Without it the HNSW scan stops at `ef_search` (40) candidates before applying the ticker/year filters, so a filtered search returned 3 passages instead of 50.
+- The full-text query ORs the extracted keywords instead of ANDing them and ranks chunks by how many distinct keywords they contain, then by `ts_rank_cd`. ANDing five keywords matched nothing for 3 of the 10 test questions.
+
+Stored chunk text has Markdown links reduced to their text (in-page anchors and EDGAR URLs are search noise).
+
 ## Schema Management
 
 Database schema changes are managed from the backend with SQLAlchemy models and Alembic migrations. Supabase is the hosted Postgres database, but the Supabase dashboard is not the source of truth for table definitions.

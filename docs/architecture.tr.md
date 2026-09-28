@@ -306,6 +306,13 @@ Supabase tabloları küçük ve ürün odaklı olmalıdır:
 
 Hibrit retrieval, `document_chunks` üzerinde iki sınırlandırılmış sorgu çalıştırır: semantik bir `pgvector` sorgusu ve bir Postgres full-text sorgusu. Backend bu sıralı listeleri Reciprocal Rank Fusion ile birleştirir, ardından seçilen parçaları ve grounding için komşu bağlamı getirir.
 
+İki retrieval ayrıntısı referans implementasyondan farklıdır *(2026-09-29'da client brief soruları üzerinde ölçülerek karar verildi)*:
+
+- Semantik sorgu pgvector'ün iterative index scan özelliğini açar (`hnsw.iterative_scan = relaxed_order`) ve adayları yeniden sıralar. Bu olmadan HNSW taraması ticker/yıl filtrelerini uygulamadan önce `ef_search` (40) adayda durur; filtreli bir arama 50 yerine 3 pasaj döndürüyordu.
+- Full-text sorgusu çıkarılan anahtar kelimeleri VE yerine VEYA ile birleştirir ve chunk'ları önce içerdikleri farklı anahtar kelime sayısına, sonra `ts_rank_cd`'ye göre sıralar. Beş anahtar kelimeyi VE'lemek 10 test sorusunun 3'ünde hiç sonuç vermiyordu.
+
+Saklanan chunk metinlerinde Markdown linkleri yalnızca metinlerine indirgenir (sayfa içi anchor'lar ve EDGAR URL'leri arama için gürültüdür).
+
 ## Şema Yönetimi
 
 Veritabanı şema değişiklikleri backend'den SQLAlchemy modelleri ve Alembic migration'ları ile yönetilir. Supabase barındırılan Postgres veritabanıdır, ancak Supabase dashboard'u tablo tanımları için doğruluk kaynağı değildir.

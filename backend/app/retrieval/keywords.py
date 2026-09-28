@@ -1,9 +1,10 @@
 """Turn an analyst question into a short keyword string for Postgres full-text search.
 
-plainto_tsquery ANDs every word it is given, so passing a whole question ("How did NVIDIA
-describe demand drivers ...") matches almost nothing. A small model picks 3-5 search terms
-instead; names the analyst typed (iPhone, Azure) and known SEC phrases are always kept, and
-a rule-based fallback covers the model being unavailable.
+Full-text search ranks chunks by how many of the keywords they contain, so the keywords
+must be the distinctive terms of the question, not its filler ("How did NVIDIA describe
+demand drivers ..."). A small model picks 3-5 search terms; names the analyst typed
+(iPhone, Azure) and known SEC phrases are always kept, and a rule-based fallback covers the
+model being unavailable.
 """
 
 import re
@@ -24,8 +25,8 @@ SYSTEM_PROMPT = """\
 You extract search keywords for PostgreSQL full-text search over SEC 10-K filing chunks.
 
 Rules:
-- Return 3 to 5 terms. Joined with spaces they must total 5 words or fewer: PostgreSQL ANDs \
-every word, and extra words cause zero matches.
+- Return 3 to 5 terms. Joined with spaces they must total 5 words or fewer: passages are \
+ranked by how many of the words they contain, so every word should be distinctive.
 - Prefer domain nouns and standard two-word SEC phrases (e.g. "data center", "revenue mix", \
 "customer concentration"); a phrase counts as two words.
 - Omit question filler and generic verbs (how, what, describe, change, drivers, across).
