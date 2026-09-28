@@ -109,14 +109,14 @@ Goal: SEC filings in the corpus are parsed, chunked, embedded, and stored in Sup
   - [] Chunking stage: per document, one transaction writes `document_tables` + `document_chunks` (+ embeddings) together and sets `ingested_at` last, so derived artifacts are always replaced as a unit
 - [] HTML → normalized Markdown extraction (preserve page/section metadata)
   - [X] Tables: Docling's Markdown tables repeat colspan cells and split `$`/`%` into their own cells, so tables are re-extracted from the raw HTML (`ingest/sec_tables.py`) into the new `document_tables` table (as in the reference). Tables are written by the chunking stage, not the source stage. `content_markdown` keeps the raw Docling output.
-  - [] Page numbers (footer formats differ per company) and `Item` section headings — still to do, during chunking
-- [] Chunking strategy (size + overlap; store chunk index, page, section, ticker, filing type, year)
+  - [X] Page / section metadata, as in the reference: `page` comes from Docling provenance (empty for SEC HTML, which has no pages); `section` from Docling headings or an `Item N` match in the chunk text. Table-row chunks use the table title as section.
+- [X] Chunking strategy (size + overlap; store chunk index, page, section, ticker, filing type, year) — `ingest/chunking.py`: Docling HybridChunker (512 tokens, cl100k_base) for narrative text; one `table_row` chunk per clean table row (title + units + header + row). Dry run: 19,409 chunks for 25 filings.
 - [X] Write `source_documents` rows with filing metadata from `manifest.json`
 - [] Write `document_chunks` rows with text + metadata
 - [] OpenAI embedding generation → store `vector(1536)` per chunk
 - [] Generated `tsvector` populated for full-text search
 - [] Idempotent re-run (skip already-ingested documents)
-- [] Unit tests: chunking logic, metadata extraction
+- [X] Unit tests: chunking logic, metadata extraction (`tests/ingest/`)
 - [] Run ingestion on full sample corpus (25 filings × 5 companies)
 - [] Verify: chunks exist in Supabase; spot-check a known passage (e.g. Apple revenue mix table)
 
