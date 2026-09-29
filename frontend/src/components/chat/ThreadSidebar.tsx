@@ -1,81 +1,179 @@
-import { LogOut, Plus, Trash2 } from 'lucide-react'
-import { NavLink, useNavigate, useParams } from 'react-router-dom'
+import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
-import { useAuth } from '@/components/auth/auth-context'
+import { Logo } from '@/components/Logo'
+import { UserMenu } from '@/components/chat/UserMenu'
 import { useThreads } from '@/components/chat/threads-context'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { supabase } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  useSidebar,
+} from '@/components/ui/sidebar'
+import type { ThreadSummary } from '@/lib/chat'
+import { groupByRecency } from '@/lib/format'
 
 export function ThreadSidebar() {
-  const { session } = useAuth()
   const { threads, isLoading, error, createThread, deleteThread } = useThreads()
   const navigate = useNavigate()
   const { threadId } = useParams()
+  const { isMobile, setOpenMobile } = useSidebar()
+  const [isCreating, setIsCreating] = useState(false)
+  const [threadToDelete, setThreadToDelete] = useState<ThreadSummary | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  async function startNewChat() {
-    const thread = await createThread()
-    navigate(`/chats/${thread.id}`)
+  function closeOnMobile() {
+    if (isMobile) setOpenMobile(false)
   }
 
-  async function removeThread(id: string, title: string) {
-    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return
-    await deleteThread(id)
-    if (id === threadId) navigate('/chats', { replace: true })
+  async function startNewChat() {
+    setIsCreating(true)
+    try {
+      const thread = await createThread()
+      navigate(`/chats/${thread.id}`)
+      closeOnMobile()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start a new chat.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!threadToDelete) return
+    setIsDeleting(true)
+    try {
+      await deleteThread(threadToDelete.id)
+      toast.success('Conversation deleted')
+      if (threadToDelete.id === threadId) navigate('/chats', { replace: true })
+      setThreadToDelete(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete the conversation.')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r bg-muted/30">
-      <div className="p-3">
-        <Button className="w-full" onClick={startNewChat}>
-          <Plus /> New chat
-        </Button>
-      </div>
+    <>
+      <Sidebar>
+        <SidebarHeader className="gap-3 p-3">
+          <Logo className="p-1" />
+          <Button
+            variant="outline"
+            className="w-full justify-start border-dashed bg-transparent text-muted-foreground shadow-none hover:text-foreground"
+            disabled={isCreating}
+            onClick={() => void startNewChat()}
+          >
+            {isCreating ? <Loader2 className="animate-spin" /> : <Plus />}
+            New chat
+          </Button>
+        </SidebarHeader>
 
-      <nav className="flex-1 overflow-y-auto px-2" aria-label="Conversations">
-        {isLoading && <p className="px-2 py-1 text-sm text-muted-foreground">Loading conversations…</p>}
-        {error && (
-          <p role="alert" className="px-2 py-1 text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        {!isLoading && !error && threads.length === 0 && (
-          <p className="px-2 py-1 text-sm text-muted-foreground">No conversations yet.</p>
-        )}
-        <ul className="flex flex-col gap-0.5">
-          {threads.map((thread) => (
-            <li key={thread.id} className="group relative">
-              <NavLink
-                to={`/chats/${thread.id}`}
-                className={({ isActive }) =>
-                  cn(
-                    'block truncate rounded-md py-2 pr-9 pl-2 text-sm hover:bg-muted',
-                    isActive && 'bg-muted font-medium',
-                  )
-                }
-              >
-                {thread.title}
-              </NavLink>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                aria-label={`Delete ${thread.title}`}
-                onClick={() => removeThread(thread.id, thread.title)}
-              >
-                <Trash2 />
-              </Button>
-            </li>
+        <SidebarContent>
+          {isLoading && (
+            <SidebarGroup>
+              <SidebarMenu>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <SidebarMenuItem key={index}>
+                    <SidebarMenuSkeleton />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
+          )}
+          {!isLoading && error && (
+            <p role="alert" className="px-4 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          {!isLoading && !error && threads.length === 0 && (
+            <p className="px-4 py-2 text-sm text-muted-foreground">No conversations yet.</p>
+          )}
+
+          {groupByRecency(threads, (thread) => thread.updatedAt).map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map((thread) => (
+                    <SidebarMenuItem key={thread.id}>
+                      <SidebarMenuButton asChild isActive={thread.id === threadId}>
+                        <Link to={`/chats/${thread.id}`} onClick={closeOnMobile}>
+                          <span className="truncate">{thread.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <SidebarMenuAction
+                        showOnHover
+                        aria-label={`Delete ${thread.title}`}
+                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setThreadToDelete(thread)}
+                      >
+                        <Trash2 />
+                      </SidebarMenuAction>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
           ))}
-        </ul>
-      </nav>
+        </SidebarContent>
 
-      <div className="flex items-center gap-2 border-t p-3">
-        <span className="flex-1 truncate text-sm text-muted-foreground">{session?.user.email}</span>
-        <Button variant="ghost" size="icon-sm" aria-label="Sign out" onClick={() => supabase.auth.signOut()}>
-          <LogOut />
-        </Button>
-      </div>
-    </aside>
+        <SidebarFooter>
+          <UserMenu />
+        </SidebarFooter>
+      </Sidebar>
+
+      <AlertDialog open={threadToDelete !== null} onOpenChange={(open) => !open && !isDeleting && setThreadToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-destructive/10 text-destructive">
+              <Trash2 />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{threadToDelete?.title}” and its message history will be deleted permanently. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={(event) => {
+                // Keep the dialog open until the delete finishes.
+                event.preventDefault()
+                void confirmDelete()
+              }}
+            >
+              {isDeleting ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

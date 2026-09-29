@@ -7,6 +7,8 @@ import { ChatEmptyPage } from '@/pages/chat/ChatEmptyPage'
 import { ChatThreadPage } from '@/pages/chat/ChatThreadPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RequestAccessPage } from '@/pages/RequestAccessPage'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -30,7 +32,10 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AuthProvider>
-      <RouterProvider router={router} />
+      <TooltipProvider>
+        <RouterProvider router={router} />
+        <Toaster />
+      </TooltipProvider>
     </AuthProvider>
   )
 }

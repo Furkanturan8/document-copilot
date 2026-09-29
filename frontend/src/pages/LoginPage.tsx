@@ -28,7 +28,7 @@ export function LoginPage() {
       footer={
         <>
           No account yet?{' '}
-          <Link to="/request-access" className="underline underline-offset-4">
+          <Link to="/request-access" className="font-medium text-foreground underline-offset-4 hover:underline">
             Request access
           </Link>
         </>
