@@ -33,6 +33,21 @@ def text_end(part_id: str) -> str:
     return sse({"type": "text-end", "id": part_id})
 
 
+def data(name: str, payload: dict[str, Any], *, part_id: str | None = None, transient: bool = False) -> str:
+    """A custom `data-<name>` part. Transient parts reach the client's onData callback but
+    are not added to the message, so progress updates do not end up in the history."""
+    chunk: dict[str, Any] = {"type": f"data-{name}", "data": payload}
+    if part_id is not None:
+        chunk["id"] = part_id
+    if transient:
+        chunk["transient"] = True
+    return sse(chunk)
+
+
+def status(stage: str, message: str) -> str:
+    return data("status", {"stage": stage, "message": message}, transient=True)
+
+
 def finish() -> str:
     return sse({"type": "finish", "finishReason": "stop"})
 

@@ -51,7 +51,7 @@ def test_agent_searches_then_returns_a_grounded_answer_citing_a_retrieved_chunk(
     deps.on_status = lambda stage, message: statuses.append(stage)
 
     with agent.get_document_agent().override(model=FunctionModel(scripted_model)):
-        answer = anyio.run(agent.run_document_agent, "NVIDIA data center revenue?", deps)
+        answer = anyio.run(agent.run_document_agent, "NVIDIA data center revenue?", deps).output
 
     assert retriever.calls == [("data center revenue", SearchFilters(ticker="NVDA"))]
     assert answer.citations[0].chunk_id == hit.chunk_id

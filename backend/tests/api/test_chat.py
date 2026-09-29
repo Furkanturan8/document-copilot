@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.api import chat as chat_api
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.main import app
+from tests.chat.test_orchestrator import fake_agent, grounded
 
 OWNER = CurrentUser(id=uuid.uuid4(), email="owner@example.com", access_token="owner-token")
 OTHER = CurrentUser(id=uuid.uuid4(), email="other@example.com", access_token="other-token")
@@ -42,7 +43,7 @@ def client_as(monkeypatch):
     monkeypatch.setattr(chat_api.chats, "list_messages", fake_list_messages)
     monkeypatch.setattr(chat_api.chats, "delete_thread", fake_delete_thread)
     monkeypatch.setattr("app.chat.orchestrator.chats.append_turn", fake_append_turn)
-    monkeypatch.setattr("app.chat.orchestrator.STUB_DELAY_SECONDS", 0)
+    monkeypatch.setattr("app.chat.orchestrator.run_document_agent", fake_agent(grounded()))
     monkeypatch.setattr(app.state, "supabase", SimpleNamespace(), raising=False)
 
     def build(user: CurrentUser) -> TestClient:
@@ -89,7 +90,7 @@ def test_stream_emits_ai_sdk_protocol_and_persists_turn(client_as):
     assert payloads[-1] == "[DONE]"
     chunks = [json.loads(p) for p in payloads[:-1]]
     types = [c["type"] for c in chunks]
-    assert types[:2] == ["start", "text-start"] and types[-2:] == ["text-end", "finish"]
+    assert types[0] == "start" and "text-start" in types and types[-2:] == ["data-citation", "finish"]
 
     streamed = "".join(c["delta"] for c in chunks if c["type"] == "text-delta")
     [(thread, user_message, assistant_message)] = client.persisted

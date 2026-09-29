@@ -86,6 +86,26 @@ def _message_row(message: UIMessage, message_id: str, thread_id: uuid.UUID, sequ
     }
 
 
+def _citation_rows(message: UIMessage) -> list[dict[str, Any]]:
+    """message_citations rows from the message's data-citation parts, so what was streamed
+    and what is stored cannot drift apart."""
+    return [
+        {
+            "message_id": message.id,
+            "chunk_id": data["chunkId"],
+            "citation_index": data["citationIndex"],
+            "excerpt": data["excerpt"],
+            "ticker": data["ticker"],
+            "company_name": data["companyName"],
+            "filing_type": data["form"],
+            "filing_date": data["filingDate"],
+            "page": data["page"],
+            "section": data["section"],
+        }
+        for data in (part["data"] for part in message.parts if part.get("type") == "data-citation")
+    ]
+
+
 async def append_turn(
     client: AsyncClient,
     thread: dict[str, Any],
@@ -106,6 +126,10 @@ async def append_turn(
         )
         .execute()
     )
+
+    citations = _citation_rows(assistant_message)
+    if citations:
+        await client.table("message_citations").insert(citations).execute()
 
     # SQLAlchemy's onupdate never fires for PostgREST writes, so updated_at is set here.
     updates: dict[str, Any] = {"updated_at": datetime.now(UTC).isoformat()}

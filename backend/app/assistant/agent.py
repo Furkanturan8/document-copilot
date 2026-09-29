@@ -4,6 +4,7 @@ from functools import cache
 from pathlib import Path
 
 from pydantic_ai import Agent, UsageLimits
+from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -36,7 +37,8 @@ def get_document_agent() -> Agent[DocumentAgentDeps, GroundedAnswer]:
     )
 
 
-async def run_document_agent(question: str, deps: DocumentAgentDeps) -> GroundedAnswer:
+async def run_document_agent(question: str, deps: DocumentAgentDeps) -> AgentRunResult[GroundedAnswer]:
+    """Run one agent turn; the result carries the answer (`.output`) and token usage (`.usage`)."""
     emit_agent_start(deps, model=settings.openai_chat_model, request_limit=settings.openai_agent_request_limit)
     result = await get_document_agent().run(
         question,
@@ -51,4 +53,4 @@ async def run_document_agent(question: str, deps: DocumentAgentDeps) -> Grounded
         input_tokens=usage.input_tokens,
         output_tokens=usage.output_tokens,
     )
-    return result.output
+    return result

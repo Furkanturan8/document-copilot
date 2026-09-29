@@ -143,11 +143,11 @@ Goal: grounded answers with enforced citations — the core product contract.
 - [X] `assistant/instructions.md` — product contract (cite everything, refuse to invent, no stock picks); corpus scope lists only what is ingested (5 tickers, 10-K, FY2021–2025)
 - [X] PydanticAI agent with typed deps (`DocumentAgentDeps`) and output (`GroundedAnswer`) — `assistant/agent.py`, async `run_document_agent`
 - [X] Agent tools: `search_filings`, `read_chunks`, `read_chunk`, `read_surrounding_chunks` — search returns 800-char excerpts; read tools return full chunk text (70.7% of narrative chunks exceed 800 chars), kept whole within the 12,000-char limit
-- [] `chat/orchestrator.py` — one turn: retrieve → agent → validate → stream → persist
+- [X] `chat/orchestrator.py` — one turn: retrieve → agent → validate → stream → persist. `answer_question` returns a `TurnOutcome` (answer, validation, registry, usage, messages); failed validation streams a controlled error and persists nothing; a disconnect during the agent run cancels it. No retry
 - [X] `grounding/validator.py` — every citation maps to a retrieved passage; fail closed on violation. Deterministic only (no LLM judge, unlike the reference): marker/citation/registry integrity, verbatim excerpts, uncited money/percent lines; figure-not-in-source is a warning. Structured `ValidationResult` (code, severity, citation_index, message). No retry yet
-- [] `chat/streaming.py` — AI SDK-compatible stream (text deltas + citation metadata parts)
-- [] Persist `message_citations` linked to assistant messages
-- [] Unit tests: citation validation, grounding enforcement, message conversion
+- [X] `chat/streaming.py` — AI SDK-compatible stream (text deltas + citation metadata parts): transient `data-status` parts while the agent runs, `data-citation` parts after the text
+- [X] Persist `message_citations` linked to assistant messages — rows built from the streamed `data-citation` parts
+- [X] Unit tests: citation validation, grounding enforcement, message conversion — `tests/grounding/`, `tests/chat/test_orchestrator.py`, `tests/assistant/`
 - [] Verify against [client-brief example questions](client-brief.md#example-analyst-questions):
   - [] Answers cite specific filings and pages
   - [] Under-specified questions get "not enough evidence" responses

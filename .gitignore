@@ -30,6 +30,7 @@ pnpm-debug.log*
 !/data/downloads/.gitkeep
 /data/markdown/*
 !/data/markdown/.gitkeep
+/data/smoke/
 *.parquet
 
 # IDE / OS
