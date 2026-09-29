@@ -350,6 +350,8 @@ The backend should enforce these invariants:
 
 This policy should be covered by backend unit tests around retrieval, citation extraction, and grounding enforcement.
 
+`grounding/validator.py` enforces this deterministically, with no LLM call: each `[n]` marker must match a citation, each citation's chunk must have been returned by a tool during the turn, each excerpt must appear verbatim (whitespace and typography normalized) in that chunk, and a money amount or percentage on a line without any marker fails the answer. A figure missing from its cited chunk is only a warning, since derived or converted figures are legitimate. These checks prove citation integrity, not that the cited text semantically supports the claim; the reference implementation adds an LLM judge for that, which this project defers until the deterministic layer has been measured on real answers.
+
 ## Error Handling
 
 Expected error classes:

@@ -352,6 +352,8 @@ Backend şu değişmezleri (invariant) zorunlu kılmalıdır:
 
 Bu politika; retrieval, alıntı çıkarma ve grounding zorunluluğu etrafında backend birim testleriyle kapsanmalıdır.
 
+`grounding/validator.py` bunu LLM çağrısı olmadan, deterministik olarak uygular: her `[n]` işaretinin bir alıntıya karşılık gelmesi, her alıntının chunk'ının o turda bir araç tarafından döndürülmüş olması, her alıntı metninin (boşluk ve tipografi normalleştirilerek) o chunk'ta birebir geçmesi gerekir; hiç işaret olmayan bir satırdaki para tutarı ya da yüzde cevabı başarısız kılar. Alıntılanan chunk'ta bulunmayan bir rakam yalnızca uyarıdır, çünkü hesaplanmış ya da birimi dönüştürülmüş rakamlar meşrudur. Bu kontroller alıntı bütünlüğünü kanıtlar, alıntılanan metnin iddiayı anlamca desteklediğini değil; referans uygulama bunun için bir LLM hakemi ekler, bu proje onu deterministik katman gerçek cevaplarla ölçülene kadar erteler.
+
 ## Hata Yönetimi
 
 Beklenen hata sınıfları:
