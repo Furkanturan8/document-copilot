@@ -4,6 +4,21 @@
 
 Analistlerin bir doküman külliyatını sade İngilizceyle sorgulayıp kaynaklı, alıntılanabilir yanıtlar almasını sağlayan dahili bir yapay zekâ sohbet botu.
 
+## Arka Plan ve Referans
+
+Bu proje bir öğrenme çalışması olarak geliştirilmiştir. Başlangıç noktası olarak [**"Build a Full-Stack GenAI Project in 4 Hours (FastAPI, React, Supabase)"**](https://www.youtube.com/watch?v=qF5il_9IwME) başlıklı YouTube eğitimi takip edilmiştir. Video; doküman yükleme, vektör arama, FastAPI backend, React frontend ve Supabase ile kimlik doğrulama ve depolama gibi temel RAG bileşenlerini kapsar ve bu parçaların birbirine nasıl bağlandığını anlamak için temel oluşturmuştur.
+
+Eğitimin ötesinde, bu repo referans uygulamada bulunmayan çeşitli mimari değişiklikler ve yeni alt sistemler içerir:
+
+- **Reciprocal Rank Fusion ile hibrit arama** — pgvector semantik arama, Postgres tam metin aramasıyla birleştirilir ve iki sıralı liste Python'da RRF ile kaynaştırılır. Semantik sorgu, filtrelenmiş aramalar için pgvector'ün yinelemeli indeks taramasını kullanır; tam metin sorgusu ise AND tabanlı eşleme yerine anahtar kelime kapsama oranına göre sıralanan OR tabanlı eşleme kullanır.
+- **Yapılandırılmış tablo çıkarımı** — finansal tablolar, Docling'in düzen yansıtmalı çıktısına güvenmek yerine ham SEC HTML'sinden temiz Markdown ve yapılandırılmış JSON (`document_tables`) olarak yeniden çıkarılır. Tablo satırları, üst tablolarına bağlanan meta verilerle ayrı ayrı parçalanır.
+- **Deterministik grounding ve atıf doğrulama** — `grounding/validator.py` atıf bütünlüğünü kod içinde zorunlu kılar (LLM çağrısı yok): her `[n]` işaretçisi bir atıfla eşleşmeli, atıf yapılan her parça ilgili turda bir araç tarafından döndürülmüş olmalı ve her alıntı kaynakta birebir bulunmalıdır. Atıf yapılmamış rakamlar yanıtı reddeder.
+- **Sayısal doğrulama + semantik risk sinyali** — `grounding/numeric.py` rakamları atıf yapılan kaynaklara karşı kontrol eder (birebir, birim dönüştürülmüş, hesaplanmış). Ayrı bir semantik hakem (Jev / TypeSafe AI) her iddiayı engelleyici olmayan bir risk sinyali olarak puanlar — referans uygulamanın yaptığı gibi yanıtları bir LLM hakemiyle engellemek yerine.
+- **Jev soru yönlendirmesi** — ajanı çalıştırmadan önce [Jev](https://docs.typesafe.ai/introduction), soruları kapsam ve tavsiye amacına göre tek bir tipli karar çağrısıyla sınıflandırır (~0,4 sn, ~0,00003 dolar). Korpus dışı ve tavsiye soruları, ajan çalıştırılmadan anında sabit yanıt alır (soru başına ~60 sn, ~0,30 dolar tasarruf).
+- **Kitap tarzı RAG eğitimi** — [`docs/tutorials/`](docs/tutorials/) dizini, "RAG nedir?" konusundan yükleme, hibrit arama, yanıt üretimi, grounding ve tipli kararlara kadar her katmanı kapsayan 13 bölümlük bir adım adım rehber içerir (İngilizce ve Türkçe).
+
+Temel yığın (FastAPI, React, Supabase, OpenAI) eğitimle örtüşür. Arama stratejisi, grounding mimarisi, soru yönlendirmesi, tablo işleme ve eğitim dokümantasyonu özgün çalışmadır.
+
 ## Müşteri
 
 **Driftwood Capital** — kurgusal, bağımsız bir yatırım araştırma firması. Analistleri, herhangi bir özgün analiz üretebilmeden önce haftalarının yarısını 10-K ve 10-Q raporlarını okuyarak geçiriyor. Document Copilot bu ön okuma işini üstlenir, böylece analistler doğrudan içgörüye geçebilir.

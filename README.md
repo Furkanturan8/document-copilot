@@ -2,6 +2,21 @@
 
 An internal AI chatbot that lets analysts query a corpus of documents in plain English and get sourced, citable answers.
 
+## Background & Acknowledgements
+
+This project was built as a learning exercise, following the tutorial [**"Build a Full-Stack GenAI Project in 4 Hours (FastAPI, React, Supabase)"**](https://www.youtube.com/watch?v=qF5il_9IwME) as the starting point. The video covers the core RAG stack — document ingestion, vector search, a FastAPI backend, a React frontend, and Supabase for auth and storage — and served as the foundation for understanding how these pieces fit together.
+
+Beyond the tutorial, this repo introduces several architectural changes and new subsystems that are not part of the reference implementation:
+
+- **Hybrid retrieval with Reciprocal Rank Fusion** — pgvector semantic search is combined with Postgres full-text search, and the two ranked lists are fused in Python with RRF. The semantic query uses pgvector's iterative index scan for filtered searches, and the full-text query uses OR-based keyword matching ranked by keyword coverage instead of AND-based matching.
+- **Structured table extraction** — financial tables are re-extracted from raw SEC HTML into clean Markdown and structured JSON (`document_tables`), rather than relying on Docling's layout-mirrored output. Table rows are chunked individually with metadata linking back to their parent table.
+- **Deterministic grounding & citation validation** — `grounding/validator.py` enforces citation integrity in code (no LLM call): every `[n]` marker must match a citation, every cited chunk must have been returned by a tool during the turn, and every excerpt must appear verbatim in the source. Uncited figures fail the answer.
+- **Numeric verification + semantic risk signal** — `grounding/numeric.py` checks figures against cited sources (exact, unit-converted, computed). A separate semantic judge (Jev / TypeSafe AI) scores each claim as a non-blocking risk signal, rather than gating answers on an LLM judge as the reference does.
+- **Jev question routing** — before running the agent, [Jev](https://docs.typesafe.ai/introduction) classifies questions by scope and advice intent in a single typed-decision call (~0.4 s, ~$0.00003). Out-of-corpus and advice questions get instant fixed replies without the agent (~60 s, ~$0.30 saved per question).
+- **Book-style RAG tutorial** — the [`docs/tutorials/`](docs/tutorials/) directory contains a 13-chapter walkthrough (in English and Turkish) covering every layer from "What is RAG?" through ingestion, hybrid search, answer generation, grounding, and typed decisions.
+
+The core stack (FastAPI, React, Supabase, OpenAI) matches the tutorial. The retrieval strategy, grounding architecture, question routing, table handling, and tutorial documentation are original work.
+
 ## The client
 
 **Driftwood Capital** — fictional independent investment research firm. Their analysts spend half their week reading 10-Ks and 10-Qs before they can produce any original analysis. Document Copilot eats that intake work so they can skip straight to insight.
