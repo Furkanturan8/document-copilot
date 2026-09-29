@@ -140,9 +140,9 @@ Goal: a user question returns ranked, relevant source passages.
 
 Goal: grounded answers with enforced citations — the core product contract.
 
-- [] `assistant/instructions.md` — product contract (cite everything, refuse to invent, no stock picks)
-- [] PydanticAI agent with typed deps (`DocumentAgentDeps`) and output (`GroundedAnswer`)
-- [] Agent tools: `search_filings`, `read_chunk`, `read_surrounding_chunks`
+- [X] `assistant/instructions.md` — product contract (cite everything, refuse to invent, no stock picks); corpus scope lists only what is ingested (5 tickers, 10-K, FY2021–2025)
+- [X] PydanticAI agent with typed deps (`DocumentAgentDeps`) and output (`GroundedAnswer`) — `assistant/agent.py`, async `run_document_agent`
+- [X] Agent tools: `search_filings`, `read_chunks`, `read_chunk`, `read_surrounding_chunks` — search returns 800-char excerpts; read tools return full chunk text (70.7% of narrative chunks exceed 800 chars), kept whole within the 12,000-char limit
 - [] `chat/orchestrator.py` — one turn: retrieve → agent → validate → stream → persist
 - [] `grounding/validator.py` — every citation maps to a retrieved passage; fail closed on violation
 - [] `chat/streaming.py` — AI SDK-compatible stream (text deltas + citation metadata parts)

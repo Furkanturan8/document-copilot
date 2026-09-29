@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
+    openai_chat_model: str = "gpt-5.5"
+    openai_agent_request_limit: int = 20  # model requests per turn, tool rounds included
 
     # Hybrid retrieval tuning; see app/retrieval/README.md.
     retrieval_candidate_k: int = 50  # hits fetched from each search path before fusion

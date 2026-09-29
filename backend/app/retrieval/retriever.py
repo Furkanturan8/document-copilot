@@ -84,12 +84,12 @@ def _hydrate(session: Session, fused: list[tuple], *, include_neighbors: bool) -
         for neighbor, neighbor_document in neighbors_by_anchor.get(chunk_id, []):
             if neighbor.id not in seen:
                 seen.add(neighbor.id)
-                neighbors.append(_passage(neighbor, neighbor_document, fusion_score=0.0))
-        passages.append(_passage(chunk, document, fusion_score=score, neighbors=neighbors))
+                neighbors.append(passage_from_chunk(neighbor, neighbor_document, fusion_score=0.0))
+        passages.append(passage_from_chunk(chunk, document, fusion_score=score, neighbors=neighbors))
     return passages
 
 
-def _passage(
+def passage_from_chunk(
     chunk: DocumentChunk,
     document: SourceDocument,
     *,
