@@ -10,7 +10,7 @@ Full brief: [docs/client-brief.md](docs/client-brief.md)
 
 ## Demo
 
-Screen recordings of the running app. Click a video thumbnail to play it.
+Screen recordings of the running app. Click an animation to open the full-quality video.
 
 Every question first goes to **[Jev](https://docs.typesafe.ai/introduction)**, TypeSafe AI's typed-decision model. In one request (~0.4 s, ~\$0.00003) Jev classifies the question's scope and whether it asks for investment advice, and code decides the route: questions the filings cannot answer get a fixed reply without running the agent (gpt-5.5, ~60 s and ~\$0.3 per question). In-corpus questions go to the agent; after its answer passes the deterministic validator, Jev also checks each claim against its sources as a non-blocking risk signal. Details: [architecture](docs/architecture.md), [Chapter 13](docs/tutorials/en/13-jev-typed-decisions.md).
 
@@ -18,19 +18,19 @@ Every question first goes to **[Jev](https://docs.typesafe.ai/introduction)**, T
 
 *What was Apple's total net sales in fiscal 2024?* → \$391.035 billion, cited to the FY2024 10-K.
 
-[![Apple FY2024 net sales](docs/media/demo-apple-net-sales-2024.png)](docs/media/demo-apple-net-sales-2024.mp4)
+[![Apple FY2024 net sales](docs/media/demo-apple-net-sales-2024.gif)](docs/media/demo-apple-net-sales-2024.mp4)
 
 ### Latest year when none is given
 
 *What's Apple's revenue?* → uses the latest filing (FY2025, \$416.161 billion) and says so.
 
-[![Apple latest revenue](docs/media/demo-apple-latest-revenue.png)](docs/media/demo-apple-latest-revenue.mp4)
+[![Apple latest revenue](docs/media/demo-apple-latest-revenue.gif)](docs/media/demo-apple-latest-revenue.mp4)
 
 ### Opening a cited passage
 
 *How did NVIDIA's gross margin change from fiscal 2024 to fiscal 2025?* → 72.7% to 75.0%; the source panel shows the verbatim excerpt.
 
-[![NVIDIA gross margin](docs/media/demo-nvidia-gross-margin.png)](docs/media/demo-nvidia-gross-margin.mp4)
+[![NVIDIA gross margin](docs/media/demo-nvidia-gross-margin.gif)](docs/media/demo-nvidia-gross-margin.mp4)
 
 ### Routed by Jev: advice and another company
 
