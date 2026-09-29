@@ -1,17 +1,19 @@
 """Question routing with Jev before the agent runs: typed decisions in, a policy in code out.
 
 Jev only classifies (scope, investment advice, complexity) with probabilities; `route`
-turns that into an action. A confident out-of-scope or advice question can be answered
-without the agent; anything uncertain goes to the agent as today. Not wired into the chat
-turn yet: measured with scripts/eval_router.py.
+turns that into an action. A confident out-of-scope or advice question is answered without
+the agent; anything uncertain, and any routing failure, goes to the agent as before.
+Measured with scripts/eval_router.py.
 """
 
+import asyncio
 import time
 from typing import Literal
 
 import httpx
 from pydantic import BaseModel
 
+from app.config import settings
 from app.grounding.judge import (
     EVALUATE_URL,
     JUDGE_MODEL,
@@ -20,6 +22,7 @@ from app.grounding.judge import (
 )
 
 Route = Literal["refuse_advice", "out_of_corpus", "agent_small", "agent_large"]
+SHORT_CIRCUIT_ROUTES: set[Route] = {"refuse_advice", "out_of_corpus"}
 
 CORPUS = (
     "Annual reports (form 10-K) of Apple (AAPL), Amazon (AMZN), Alphabet/Google (GOOGL), "
@@ -45,6 +48,21 @@ ADVICE_CRITERIA = {
 # Acting without the agent is only worth it when Jev is sure; everything else keeps today's path.
 SHORT_CIRCUIT_CONFIDENCE = 0.8
 SMALL_MODEL_CONFIDENCE = 0.8
+
+
+# Fixed answers for questions the corpus cannot answer: no agent run, no citations.
+SHORT_CIRCUIT_ANSWERS: dict[Route, str] = {
+    "refuse_advice": (
+        "I can't give investment advice, stock picks or price targets. I can tell you what the "
+        "10-K filings of Apple, Amazon, Alphabet, Microsoft and NVIDIA for fiscal 2021-2025 say, "
+        "for example about revenue, margins or risk factors."
+    ),
+    "out_of_corpus": (
+        "That is outside what I can answer. My sources are the 10-K annual reports of Apple, Amazon, "
+        "Alphabet, Microsoft and NVIDIA for fiscal 2021-2025; they contain no stock prices, forecasts, "
+        "news, other years or other companies' filings."
+    ),
+}
 
 
 class RouteDecision(BaseModel):
@@ -107,3 +125,20 @@ def route(decision: RouteDecision) -> Route:
     if decision.complexity == "simple" and decision.complexity_confidence >= SMALL_MODEL_CONFIDENCE:
         return "agent_small"
     return "agent_large"
+
+
+class RoutingResult(BaseModel):
+    route: Route
+    decision: RouteDecision | None  # None when routing was skipped or failed
+    error: str | None = None
+
+
+async def decide_route(question: str) -> RoutingResult:
+    """Never raises: without a key, or if Jev fails or is slow, the question goes to the agent."""
+    if settings.typesafe_api_key is None:
+        return RoutingResult(route="agent_large", decision=None)
+    try:
+        decision = await asyncio.wait_for(classify_question(question), settings.jev_router_timeout_seconds)
+    except (httpx.HTTPError, TimeoutError, KeyError, ValueError) as exc:
+        return RoutingResult(route="agent_large", decision=None, error=f"{type(exc).__name__}: {exc}")
+    return RoutingResult(route=route(decision), decision=decision)

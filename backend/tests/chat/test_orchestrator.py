@@ -4,10 +4,13 @@ from types import SimpleNamespace
 
 import anyio
 import anyio.lowlevel
+import httpx
 from pydantic_ai.usage import RunUsage
 
+from app.assistant import router
 from app.assistant.outputs import Citation, GroundedAnswer
 from app.chat import orchestrator
+from app.config import settings
 from app.chat.messages import UIMessage
 from app.database.chats import _citation_rows
 from tests.assistant.test_tools import _passage
@@ -181,3 +184,65 @@ def test_disconnect_while_the_agent_runs_cancels_the_agent(monkeypatch):
     anyio.run(disconnect_after_first_status)
 
     assert persisted == []
+
+
+def _route_to(monkeypatch, *, advice=0.0, complexity="complex", fail=False):
+    async def classify(question):
+        if fail:
+            raise httpx.ConnectError("jev down")
+        return router.RouteDecision(
+            scope="in_corpus",
+            scope_confidence=0.95,
+            advice_probability=advice,
+            complexity=complexity,
+            complexity_confidence=0.95,
+            input_tokens=300,
+            cost_usd=0.0,
+            seconds=0.1,
+        )
+
+    monkeypatch.setattr(settings, "typesafe_api_key", "test-key")
+    monkeypatch.setattr(router, "classify_question", classify)
+
+
+def _deps() -> orchestrator.DocumentAgentDeps:
+    return orchestrator.DocumentAgentDeps(
+        retriever=None, registry=orchestrator.TurnRegistry(), thread_id=uuid.uuid4(), user_id=uuid.uuid4()
+    )
+
+
+def test_confident_advice_question_gets_the_fixed_answer_without_running_the_agent(monkeypatch):
+    started = []
+    persisted = use_fakes(monkeypatch, started=started)
+    _route_to(monkeypatch, advice=0.95)
+
+    chunks = anyio.run(_collect)
+
+    streamed = "".join(c["delta"] for c in chunks if isinstance(c, dict) and c["type"] == "text-delta")
+    assert started == []
+    assert streamed == router.SHORT_CIRCUIT_ANSWERS["refuse_advice"]
+    assert not any(isinstance(c, dict) and c["type"] == "data-citation" for c in chunks)
+    [assistant_message] = persisted
+    assert assistant_message.parts[0]["text"] == streamed
+
+
+def test_router_failure_falls_back_to_the_agent(monkeypatch):
+    started = []
+    use_fakes(monkeypatch, started=started)
+    _route_to(monkeypatch, fail=True)
+
+    outcome = anyio.run(orchestrator.answer_question, "Apple revenue?", _deps())
+
+    assert started == ["Apple revenue?"]
+    assert outcome.routing.route == "agent_large" and outcome.routing.error.startswith("ConnectError")
+    assert outcome.validation.ok
+
+
+def test_small_model_route_is_only_recorded_and_the_agent_still_runs(monkeypatch):
+    started = []
+    use_fakes(monkeypatch, started=started)
+    _route_to(monkeypatch, complexity="simple")
+
+    outcome = anyio.run(orchestrator.answer_question, "Apple revenue?", _deps())
+
+    assert started == ["Apple revenue?"] and outcome.routing.route == "agent_small"

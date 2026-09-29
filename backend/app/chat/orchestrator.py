@@ -1,4 +1,4 @@
-"""One chat turn end to end: agent -> validate -> risk signal -> stream -> persist."""
+"""One chat turn end to end: route -> agent -> validate -> risk signal -> stream -> persist."""
 
 import asyncio
 import time
@@ -16,6 +16,12 @@ from supabase import AsyncClient
 from app.assistant.agent import run_document_agent
 from app.assistant.deps import DocumentAgentDeps, TurnRegistry
 from app.assistant.outputs import GroundedAnswer
+from app.assistant.router import (
+    SHORT_CIRCUIT_ANSWERS,
+    SHORT_CIRCUIT_ROUTES,
+    RoutingResult,
+    decide_route,
+)
 from app.chat import streaming
 from app.chat.messages import UIMessage, build_assistant_message, message_text
 from app.database import chats
@@ -47,9 +53,24 @@ class TurnOutcome:
     messages: list[ModelMessage]  # the full model/tool exchange, for smoke runs and debugging
     agent_seconds: float
     risk: RiskReport | None = None  # semantic risk signal; only for answers that passed validation
+    routing: RoutingResult | None = None
 
 
 async def answer_question(question: str, deps: DocumentAgentDeps) -> TurnOutcome:
+    routing = await decide_route(question)
+    logger.info(
+        "question_routing",
+        thread_id=str(deps.thread_id),
+        route=routing.route,
+        decision=routing.decision.model_dump() if routing.decision else None,
+        error=routing.error,
+    )
+    if routing.route in SHORT_CIRCUIT_ROUTES:
+        # Advice or out-of-scope with high confidence: a fixed answer, no agent run.
+        answer = GroundedAnswer(answer=SHORT_CIRCUIT_ANSWERS[routing.route], insufficient_evidence=True)
+        validation = validate_grounded_answer(answer, deps.registry)
+        return TurnOutcome(answer, validation, deps.registry, RunUsage(), [], 0.0, routing=routing)
+
     started = time.perf_counter()
     result = await run_document_agent(question, deps)
     agent_seconds = time.perf_counter() - started
@@ -65,7 +86,9 @@ async def answer_question(question: str, deps: DocumentAgentDeps) -> TurnOutcome
         citations=len(answer.citations),
         issues=[issue.model_dump() for issue in validation.issues],
     )
-    outcome = TurnOutcome(answer, validation, deps.registry, result.usage, result.all_messages(), agent_seconds)
+    outcome = TurnOutcome(
+        answer, validation, deps.registry, result.usage, result.all_messages(), agent_seconds, routing=routing
+    )
     if validation.ok and answer.citations:
         outcome.risk = await assess_risk(answer, deps.registry)
         logger.info(

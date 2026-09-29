@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     jev_timeout_seconds: float = 10.0
     jev_warning_confidence: float = 0.5  # below: ignored
     jev_high_confidence: float = 0.8  # a contradiction at or above: high risk
+    # Question routing (app/assistant/router.py) runs before the agent, so it gets a short leash.
+    jev_router_timeout_seconds: float = 2.0
 
     # Hybrid retrieval tuning; see app/retrieval/README.md.
     retrieval_candidate_k: int = 50  # hits fetched from each search path before fusion
