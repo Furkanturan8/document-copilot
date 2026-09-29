@@ -134,11 +134,11 @@ async def _judge_one(client: httpx.AsyncClient, case: JudgeCase) -> JudgeVerdict
 
 async def judge_citations(cases: list[JudgeCase]) -> list[JudgeVerdict]:
     """One request per citation, run concurrently: each claim is judged against its own source only."""
-    async with httpx.AsyncClient(headers=_headers(), timeout=30) as client:
+    async with httpx.AsyncClient(headers=typesafe_headers(), timeout=30) as client:
         return list(await asyncio.gather(*(_judge_one(client, case) for case in cases)))
 
 
-def _headers() -> dict[str, str]:
+def typesafe_headers() -> dict[str, str]:
     if settings.typesafe_api_key is None:
         raise RuntimeError("TYPESAFE_API_KEY is not set")
     return {"Authorization": f"Bearer {settings.typesafe_api_key.get_secret_value()}"}
@@ -246,7 +246,7 @@ async def judge_claims(
     """
     bodies = _batched_bodies(claims, sources) if batched else _isolated_bodies(claims, sources)
     started = time.perf_counter()
-    async with httpx.AsyncClient(headers=_headers(), timeout=30) as client:
+    async with httpx.AsyncClient(headers=typesafe_headers(), timeout=30) as client:
         results = await asyncio.gather(*(_evaluate(client, body) for body in bodies))
     input_tokens = sum(tokens for _, tokens in results)
     usage = JudgeUsage(

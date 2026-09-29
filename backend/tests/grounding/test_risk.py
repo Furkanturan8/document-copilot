@@ -170,7 +170,7 @@ def test_jev_contradiction_raises_the_signal_but_never_fails_the_answer(monkeypa
 
     real_client = httpx.AsyncClient
     monkeypatch.setattr(settings, "typesafe_api_key", "test-key")
-    monkeypatch.setattr(judge, "_headers", dict)
+    monkeypatch.setattr(judge, "typesafe_headers", dict)
     monkeypatch.setattr(
         judge.httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(jev), **kwargs)
     )
