@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     openai_agent_output_tokens_limit: int = 20_000  # summed over requests
     openai_agent_max_tokens_per_response: int = 12_000
 
+    # Jev semantic risk signal (app/grounding/risk.py): telemetry only, never fails an answer.
+    # Without a key it is skipped and only the numeric checks run.
+    typesafe_api_key: SecretStr | None = None
+    jev_timeout_seconds: float = 10.0
+    jev_warning_confidence: float = 0.5  # below: ignored
+    jev_high_confidence: float = 0.8  # a contradiction at or above: high risk
+
     # Hybrid retrieval tuning; see app/retrieval/README.md.
     retrieval_candidate_k: int = 50  # hits fetched from each search path before fusion
     retrieval_top_k: int = 10  # fused passages returned

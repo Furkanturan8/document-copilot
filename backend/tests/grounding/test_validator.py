@@ -247,29 +247,6 @@ def test_all_problems_are_reported_together():
     assert _codes(result) == ["chunk_not_retrieved", "excerpt_not_in_chunk"]
 
 
-# --- Warnings: reported, but the answer still passes ----------------------------------
-
-
-def test_figure_missing_from_its_cited_chunk_is_a_warning_not_a_failure():
-    answer = _answer(
-        "Revenue roughly tripled to $47.5 billion, a 3.2% share [1].",
-        (1, REVENUE.chunk_id, "Data Center revenue for fiscal year 2024 was $47.5 billion"),
-    )
-
-    result = validate_grounded_answer(answer, _registry(REVENUE))
-
-    assert result.ok
-    assert [(w.code, w.citation_index) for w in result.warnings] == [("figure_not_in_cited_chunks", 1)]
-    assert "3.2%" in result.warnings[0].message
-
-
-def test_figure_formats_are_compared_by_number():
-    table = _passage("| Revenue | $ 60,922 | $ 26,974 |")
-    answer = _answer("Revenue was $60,922 million [1].", (1, table.chunk_id, "| Revenue | $ 60,922 |"))
-
-    assert validate_grounded_answer(answer, _registry(table)).issues == []
-
-
 # --- Known limits: these pass although a careful reader would object -----------------
 
 
@@ -299,9 +276,7 @@ def test_limit_a_cited_line_covers_its_other_sentences():
         (1, REVENUE.chunk_id, "Data Center revenue for fiscal year 2024 was $47.5 billion"),
     )
 
-    result = validate_grounded_answer(answer, _registry(REVENUE))
-
-    assert result.ok and [w.code for w in result.warnings] == ["figure_not_in_cited_chunks"]
+    assert validate_grounded_answer(answer, _registry(REVENUE)).ok
 
 
 # --- Pruning ----------------------------------------------------------------------------

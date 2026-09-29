@@ -90,7 +90,7 @@ def test_stream_emits_ai_sdk_protocol_and_persists_turn(client_as):
     assert payloads[-1] == "[DONE]"
     chunks = [json.loads(p) for p in payloads[:-1]]
     types = [c["type"] for c in chunks]
-    assert types[0] == "start" and "text-start" in types and types[-2:] == ["data-citation", "finish"]
+    assert types[0] == "start" and "text-start" in types and types[-3:] == ["data-citation", "data-grounding-risk", "finish"]
 
     streamed = "".join(c["delta"] for c in chunks if c["type"] == "text-delta")
     [(thread, user_message, assistant_message)] = client.persisted

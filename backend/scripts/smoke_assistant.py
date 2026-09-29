@@ -98,6 +98,7 @@ def _record(number: int, question: str, outcome: TurnOutcome, wall_seconds: floa
             "errors": [issue.model_dump() for issue in outcome.validation.errors],
             "warnings": [issue.model_dump() for issue in outcome.validation.warnings],
         },
+        "risk": outcome.risk.model_dump() if outcome.risk else None,
         "insufficient_evidence": outcome.answer.insufficient_evidence,
         "citations": [
             {

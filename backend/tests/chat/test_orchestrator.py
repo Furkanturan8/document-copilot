@@ -68,7 +68,9 @@ def test_validated_answer_streams_statuses_text_and_citations_then_persists(monk
     chunks = anyio.run(_collect)
 
     types = [c if isinstance(c, str) else c["type"] for c in chunks]
-    assert types[0] == "start" and types[-3:] == ["data-citation", "finish", "[DONE]"]
+    assert types[0] == "start" and types[-4:] == ["data-citation", "data-grounding-risk", "finish", "[DONE]"]
+    risk = chunks[-3]
+    assert risk["transient"] and risk["data"] == {"level": "none", "claims": []}
     statuses = [c for c in chunks if isinstance(c, dict) and c["type"] == "data-status"]
     assert [s["data"]["stage"] for s in statuses] == ["searching"]
     assert all(s["transient"] for s in statuses)
@@ -76,7 +78,7 @@ def test_validated_answer_streams_statuses_text_and_citations_then_persists(monk
 
     streamed = "".join(c["delta"] for c in chunks if isinstance(c, dict) and c["type"] == "text-delta")
     assert streamed == "Apple's net sales were $391.0 billion [1]."
-    citation = chunks[-3]["data"]
+    citation = chunks[-4]["data"]
     assert citation["chunkId"] == str(SOURCE.chunk_id) and citation["ticker"] == "AAPL"
 
     [assistant_message] = persisted

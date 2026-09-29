@@ -24,8 +24,6 @@ FIGURE_RE = re.compile(
     r"|\d[\d,]*(?:\.\d+)?\s?(?:%|percent\b)",
     re.IGNORECASE,
 )
-NUMBER_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
-THOUSANDS_COMMA_RE = re.compile(r"(?<=\d),(?=\d{3}\b)")
 # Our search output marks cut excerpts with "..."; a model copying one keeps the dots.
 EDGE_ELLIPSIS_RE = re.compile(r"^(?:\.\.\.|…)\s*|\s*(?:\.\.\.|…)$")
 # Models often write typographic variants the filings do not use: gpt-oss emits U+2011
@@ -63,7 +61,6 @@ IssueCode = Literal[
     "excerpt_too_short",
     "excerpt_not_in_chunk",
     "uncited_figure",
-    "figure_not_in_cited_chunks",
 ]
 
 
@@ -142,7 +139,7 @@ def validate_grounded_answer(answer: GroundedAnswer, registry: TurnRegistry) -> 
 
     issues = _structure_issues(answer)
     issues += _citation_issues(answer, registry)
-    issues += _figure_issues(answer, registry)
+    issues += _figure_issues(answer)
     return ValidationResult(issues=issues)
 
 
@@ -223,54 +220,21 @@ def _citation_issues(answer: GroundedAnswer, registry: TurnRegistry) -> list[Val
     return issues
 
 
-def _figure_issues(answer: GroundedAnswer, registry: TurnRegistry) -> list[ValidationIssue]:
-    """Line-level checks on money amounts and percentages.
+def _figure_issues(answer: GroundedAnswer) -> list[ValidationIssue]:
+    """A money amount or percentage on a line without any marker is an uncited claim.
 
     Lines rather than sentences: abbreviations ("U.S.", "vs.") make sentence splitting
-    unreliable, and a wrong split would flag a properly cited figure.
+    unreliable, and a wrong split would flag a properly cited figure. Whether a cited
+    figure matches its sources is app/grounding/numeric.py's job.
     """
-    chunk_by_index = {
-        citation.citation_index: registry.passages_by_chunk_id[citation.chunk_id]
-        for citation in answer.citations
-        if citation.chunk_id in registry.passages_by_chunk_id
-    }
     issues: list[ValidationIssue] = []
     for line in answer.answer.splitlines():
         figures = list(FIGURE_RE.finditer(line))
-        if not figures:
-            continue
-        markers = list(MARKER_RE.finditer(line))
-        if not markers:
+        if figures and not MARKER_RE.search(line):
             issues.append(
                 ValidationIssue(
                     code="uncited_figure",
                     message=f"{figures[0].group().strip()!r} is stated without any citation: {line.strip()!r}",
                 )
             )
-            continue
-        for figure in figures:
-            cited = _nearest_marker(figure, markers)
-            sources = [chunk_by_index[index].text for index in cited if index in chunk_by_index]
-            if sources and not any(_number_in_text(figure.group(), source) for source in sources):
-                issues.append(
-                    ValidationIssue(
-                        code="figure_not_in_cited_chunks",
-                        severity="warning",
-                        message=f"{figure.group().strip()!r} does not appear in the chunks cited for it; it may be derived, converted or unsupported.",
-                        citation_index=min(cited),
-                    )
-                )
     return issues
-
-
-def _nearest_marker(figure: re.Match, markers: list[re.Match]) -> set[int]:
-    # Citations usually follow their claim; a figure after the last marker takes that one.
-    following = [marker for marker in markers if marker.start() >= figure.end()]
-    marker = following[0] if following else markers[-1]
-    return marker_indices(marker.group())
-
-
-def _number_in_text(figure: str, text: str) -> bool:
-    number = THOUSANDS_COMMA_RE.sub("", NUMBER_RE.search(figure).group())
-    plain = THOUSANDS_COMMA_RE.sub("", normalize_text(text))
-    return re.search(rf"(?<![\d.]){re.escape(number)}(?!\d)", plain) is not None

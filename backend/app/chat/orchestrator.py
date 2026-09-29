@@ -1,4 +1,4 @@
-"""One chat turn end to end: agent -> validate -> stream -> persist."""
+"""One chat turn end to end: agent -> validate -> risk signal -> stream -> persist."""
 
 import asyncio
 import time
@@ -19,6 +19,7 @@ from app.assistant.outputs import GroundedAnswer
 from app.chat import streaming
 from app.chat.messages import UIMessage, build_assistant_message, message_text
 from app.database import chats
+from app.grounding.risk import RiskReport, assess_risk
 from app.grounding.validator import (
     ValidationResult,
     prune_unreferenced_citations,
@@ -45,6 +46,7 @@ class TurnOutcome:
     usage: RunUsage
     messages: list[ModelMessage]  # the full model/tool exchange, for smoke runs and debugging
     agent_seconds: float
+    risk: RiskReport | None = None  # semantic risk signal; only for answers that passed validation
 
 
 async def answer_question(question: str, deps: DocumentAgentDeps) -> TurnOutcome:
@@ -63,7 +65,30 @@ async def answer_question(question: str, deps: DocumentAgentDeps) -> TurnOutcome
         citations=len(answer.citations),
         issues=[issue.model_dump() for issue in validation.issues],
     )
-    return TurnOutcome(answer, validation, deps.registry, result.usage, result.all_messages(), agent_seconds)
+    outcome = TurnOutcome(answer, validation, deps.registry, result.usage, result.all_messages(), agent_seconds)
+    if validation.ok and answer.citations:
+        outcome.risk = await assess_risk(answer, deps.registry)
+        logger.info(
+            "grounding_risk",
+            thread_id=str(deps.thread_id),
+            level=outcome.risk.level,
+            flagged=[claim.model_dump() for claim in outcome.risk.claims if claim.level != "none"],
+            judge=outcome.risk.judge.model_dump() if outcome.risk.judge else None,
+            judge_error=outcome.risk.judge_error,
+        )
+    return outcome
+
+
+def _risk_payload(risk: RiskReport) -> dict[str, Any]:
+    # Transient: a signal for the UI, not part of the stored answer.
+    return {
+        "level": risk.level,
+        "claims": [
+            {"citationIndices": claim.citation_indices, "level": claim.level, "reasons": claim.reasons}
+            for claim in risk.claims
+            if claim.level != "none"
+        ],
+    }
 
 
 async def _persist_turn(
@@ -137,6 +162,8 @@ async def run_turn(
         yield streaming.text_end(text_id)
         for part in assistant_message.parts[1:]:
             yield streaming.data("citation", part["data"], part_id=part["id"])
+        if outcome.risk is not None:
+            yield streaming.data("grounding-risk", _risk_payload(outcome.risk), transient=True)
     finally:
         persisted = await _persist_turn(client, thread, user_message, assistant_message)
 
