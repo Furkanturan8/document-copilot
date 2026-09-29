@@ -14,17 +14,17 @@ Tam brif: [docs/client-brief.tr.md](docs/client-brief.tr.md)
 
 Çalışan uygulamadan ekran kayıtları. Yüksek kaliteli videoyu açmak için animasyona tıklayın.
 
-Her soru önce TypeSafe AI'ın tipli karar modeli **[Jev](https://docs.typesafe.ai/introduction)**'e gider. Jev tek istekte (~0,4 sn, ~0,00003 \$) sorunun kapsamını ve yatırım tavsiyesi isteyip istemediğini sınıflandırır, rotayı ise kod belirler: raporların yanıtlayamayacağı sorular ajan çalıştırılmadan sabit bir yanıt alır (ajan: gpt-5.5, soru başına ~60 sn ve ~0,3 \$). Korpus içi sorular ajana gider; yanıt deterministik doğrulayıcıdan geçtikten sonra Jev her iddiayı kaynaklarıyla karşılaştırır ve yanıtı engellemeyen bir risk sinyali üretir. Ayrıntılar: [mimari](docs/architecture.tr.md), [13. bölüm](docs/tutorials/tr/13-jev-tipli-kararlar.md).
+Her soru önce TypeSafe AI'ın tipli karar modeli **[Jev](https://docs.typesafe.ai/introduction)**'e gider. Jev tek istekte (~0,4 sn, ~0,00003 dolar) sorunun kapsamını ve yatırım tavsiyesi isteyip istemediğini sınıflandırır, rotayı ise kod belirler: raporların yanıtlayamayacağı sorular ajan çalıştırılmadan sabit bir yanıt alır (ajan: gpt-5.5, soru başına ~60 sn ve ~0,3 dolar). Korpus içi sorular ajana gider; yanıt deterministik doğrulayıcıdan geçtikten sonra Jev her iddiayı kaynaklarıyla karşılaştırır ve yanıtı engellemeyen bir risk sinyali üretir. Ayrıntılar: [mimari](docs/architecture.tr.md), [13. bölüm](docs/tutorials/tr/13-jev-tipli-kararlar.md).
 
 ### Kaynaklı yanıt
 
-*What was Apple's total net sales in fiscal 2024?* → 391,035 milyar \$, FY2024 10-K'ya atıflı.
+*What was Apple's total net sales in fiscal 2024?* → 391,035 milyar dolar, FY2024 10-K'ya atıflı.
 
 [![Apple FY2024 net satış](docs/media/demo-apple-net-sales-2024.gif)](docs/media/demo-apple-net-sales-2024.mp4)
 
 ### Yıl verilmezse en son yıl
 
-*What's Apple's revenue?* → en son raporu (FY2025, 416,161 milyar \$) kullanır ve bunu belirtir.
+*What's Apple's revenue?* → en son raporu (FY2025, 416,161 milyar dolar) kullanır ve bunu belirtir.
 
 [![Apple son gelir](docs/media/demo-apple-latest-revenue.gif)](docs/media/demo-apple-latest-revenue.mp4)
 

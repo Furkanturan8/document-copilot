@@ -12,7 +12,7 @@ Full brief: [docs/client-brief.md](docs/client-brief.md)
 
 Screen recordings of the running app. Click an animation to open the full-quality video.
 
-Every question first goes to **[Jev](https://docs.typesafe.ai/introduction)**, TypeSafe AI's typed-decision model. In one request (~0.4 s, ~\$0.00003) Jev classifies the question's scope and whether it asks for investment advice, and code decides the route: questions the filings cannot answer get a fixed reply without running the agent (gpt-5.5, ~60 s and ~\$0.3 per question). In-corpus questions go to the agent; after its answer passes the deterministic validator, Jev also checks each claim against its sources as a non-blocking risk signal. Details: [architecture](docs/architecture.md), [Chapter 13](docs/tutorials/en/13-jev-typed-decisions.md).
+Every question first goes to **[Jev](https://docs.typesafe.ai/introduction)**, TypeSafe AI's typed-decision model. In one request (~0.4 s, ~0.00003 USD) Jev classifies the question's scope and whether it asks for investment advice, and code decides the route: questions the filings cannot answer get a fixed reply without running the agent (gpt-5.5, ~60 s and ~0.3 USD per question). In-corpus questions go to the agent; after its answer passes the deterministic validator, Jev also checks each claim against its sources as a non-blocking risk signal. Details: [architecture](docs/architecture.md), [Chapter 13](docs/tutorials/en/13-jev-typed-decisions.md).
 
 ### Cited answer
 
