@@ -150,7 +150,7 @@ Goal: grounded answers with enforced citations — the core product contract.
 - [X] Unit tests: citation validation, grounding enforcement, message conversion — `tests/grounding/`, `tests/chat/test_orchestrator.py`, `tests/assistant/`
 - [] Verify against [client-brief example questions](client-brief.md#example-analyst-questions):
   - [X] Answers cite specific filings and pages — gpt-5.5, `scripts/smoke_assistant.py`: 6/10 client-brief answers pass validation with filing/page/section citations; Q3, Q7 rejected (model edited long excerpts), Q6, Q8 hit the 200K-token limit
-  - [] Under-specified questions get "not enough evidence" responses
+  - [] Under-specified questions get "not enough evidence" responses — instructions now say: no year → use the latest fiscal year and say so; not enough evidence → no citations. Jev routing turns away confident out-of-scope and advice questions. Needs one paid run to confirm
   - [X] Question 10 (generative AI margins) refuses to infer beyond filings — presents the evidence and declines the causal claim
 
 ---
@@ -159,11 +159,11 @@ Goal: grounded answers with enforced citations — the core product contract.
 
 Goal: analysts can verify every claim in one click — this is what makes the product usable.
 
-- [] Citation chips/links on assistant messages (company, filing type, date, page/section)
-- [] Source passage panel — show underlying excerpt for selected citation
-- [] Empty states (no threads, no corpus match)
-- [] Error states (auth expired, retrieval failure, grounding failure, network/CORS)
-- [] Loading/streaming status during assistant run
+- [X] Citation chips/links on assistant messages (company, filing type, date, page/section) — `CitationChip`, `CitationMarker`
+- [X] Source passage panel — show underlying excerpt for selected citation — `SourcePassageSheet`
+- [X] Empty states (no threads, no corpus match) — `ChatEmptyPage`; no-evidence answers render as normal replies
+- [X] Error states (auth expired, retrieval failure, grounding failure, network/CORS) — `ChatError`, `lib/chat-errors.ts`
+- [X] Loading/streaming status during assistant run — transient `data-status` parts via `onData` → `PipelineStatus`
 - [] Verify: click a citation → see the exact passage from the filing
 
 ---
@@ -172,21 +172,21 @@ Goal: analysts can verify every claim in one click — this is what makes the pr
 
 Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per analyst per week.
 
-- [] README "Running locally" section — copy-paste commands for backend + frontend + env vars
-- [] Seed or document how to ingest/update the corpus
-- [] Smoke-test all 10 example questions from the client brief
+- [X] README "Running locally" section — copy-paste commands for backend + frontend + env vars
+- [X] Seed or document how to ingest/update the corpus — README "Loading the corpus"
+- [] Smoke-test all 10 example questions from the client brief — last full run (before the excerpt-rule instructions): 6/10 pass; Q3, Q7 rejected for edited excerpts, Q6, Q8 hit the 200K-token limit. Rerun needs ~$3–4 of OpenAI credit
 - [] Confirm chat history persists across sessions
-- [] Confirm ~40-user scale assumptions (no hardcoded single-user shortcuts)
-- [] Basic structured logging on backend (`structlog`) for debugging failed turns
-- [ ] Review latency: streaming starts within a few seconds for typical queries
+- [] Confirm ~40-user scale assumptions (no hardcoded single-user shortcuts) — per-user auth and RLS, no single-user shortcuts. Limit: the default SQLAlchemy pool (5 + 10 overflow) makes turns wait for a connection beyond ~5–6 concurrent turns
+- [X] Basic structured logging on backend (`structlog`) for debugging failed turns — `question_routing`, `grounding_validation`, `grounding_risk`, `chat_turn_agent_failed`
+- [ ] Review latency: streaming starts within a few seconds for typical queries — status parts stream from the first second; the answer text arrives after 60–100 s with gpt-5.5; routed refusals under 1 s
 
 ---
 
 ## Phase 9 — Deployment (Railway)
 
-- [] Railway: backend service (Uvicorn, env vars, `ALLOWED_ORIGINS`)
-- [] Railway: frontend service (Vite build, `VITE_*` env vars at build time)
-- [] Supabase: re-enable email confirmation for production if disabled during dev
+- [] Railway: backend service (Uvicorn, env vars, `ALLOWED_ORIGINS`) — `backend/Dockerfile`, guide in `docs/guides/railway-deployment.md`
+- [] Railway: frontend service (Vite build, `VITE_*` env vars at build time) — `frontend/Dockerfile` + `Caddyfile`
+- [X] Supabase: re-enable email confirmation for production if disabled during dev — not applicable: sign-up is disabled; pilot users are created in the Supabase dashboard
 - [] Run `alembic upgrade head` against production Supabase (direct connection)
 - [] Run ingestion against production database
 - [] End-to-end test on deployed URLs with a real Driftwood-style email account

@@ -188,7 +188,7 @@ def test_disconnect_while_the_agent_runs_cancels_the_agent(monkeypatch):
     assert persisted == []
 
 
-def _route_to(monkeypatch, *, advice=0.0, complexity="complex", fail=False):
+def _route_to(monkeypatch, *, advice=0.0, fail=False):
     async def classify(question):
         if fail:
             raise httpx.ConnectError("jev down")
@@ -196,8 +196,6 @@ def _route_to(monkeypatch, *, advice=0.0, complexity="complex", fail=False):
             scope="in_corpus",
             scope_confidence=0.95,
             advice_probability=advice,
-            complexity=complexity,
-            complexity_confidence=0.95,
             input_tokens=300,
             cost_usd=0.0,
             seconds=0.1,
@@ -241,15 +239,5 @@ def test_router_failure_falls_back_to_the_agent(monkeypatch):
     outcome = anyio.run(orchestrator.answer_question, "Apple revenue?", _deps())
 
     assert started == ["Apple revenue?"]
-    assert outcome.routing.route == "agent_large" and outcome.routing.error.startswith("ConnectError")
+    assert outcome.routing.route == "agent" and outcome.routing.error.startswith("ConnectError")
     assert outcome.validation.ok
-
-
-def test_small_model_route_is_only_recorded_and_the_agent_still_runs(monkeypatch):
-    started = []
-    use_fakes(monkeypatch, started=started)
-    _route_to(monkeypatch, complexity="simple")
-
-    outcome = anyio.run(orchestrator.answer_question, "Apple revenue?", _deps())
-
-    assert started == ["Apple revenue?"] and outcome.routing.route == "agent_small"

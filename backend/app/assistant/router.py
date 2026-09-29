@@ -1,6 +1,6 @@
 """Question routing with Jev before the agent runs: typed decisions in, a policy in code out.
 
-Jev only classifies (scope, investment advice, complexity) with probabilities; `route`
+Jev only classifies (scope, investment advice) with probabilities; `route`
 turns that into an action. A confident out-of-scope or advice question is answered without
 the agent; anything uncertain, and any routing failure, goes to the agent as before.
 Measured with scripts/eval_router.py.
@@ -22,7 +22,7 @@ from app.grounding.judge import (
     typesafe_headers,
 )
 
-Route = Literal["refuse_advice", "out_of_corpus", "agent_small", "agent_large"]
+Route = Literal["refuse_advice", "out_of_corpus", "agent"]
 SHORT_CIRCUIT_ROUTES: set[Route] = {"refuse_advice", "out_of_corpus"}
 
 CORPUS = (
@@ -38,10 +38,6 @@ SCOPE_CRITERIA = {
         "forecasts, news, or events and statements outside the filings"
     ),
 }
-COMPLEXITY_CRITERIA = {
-    "simple": "One company and one specific fact, figure or disclosure, for one or two years",
-    "complex": "Several companies or years, a trend, comparison or change over time, or a synthesis of many disclosures",
-}
 ADVICE_CRITERIA = {
     "true": "Asks whether to buy, sell or hold a stock, which stock is the best investment, or for a price target",
     "false": "Asks what the filings say, even about risks, valuation inputs or shareholder returns",
@@ -54,7 +50,6 @@ CORPUS_COMPANY_RE = re.compile(
 )
 # Acting without the agent is only worth it when Jev is sure; everything else keeps today's path.
 SHORT_CIRCUIT_CONFIDENCE = 0.8
-SMALL_MODEL_CONFIDENCE = 0.8
 
 
 # Fixed answers for questions the corpus cannot answer: no agent run, no citations.
@@ -76,8 +71,6 @@ class RouteDecision(BaseModel):
     scope: str
     scope_confidence: float
     advice_probability: float
-    complexity: str
-    complexity_confidence: float
     input_tokens: int
     cost_usd: float
     seconds: float
@@ -98,11 +91,6 @@ async def classify_question(question: str) -> RouteDecision:
                 "instructions": "Does the analyst question ask for investment advice?",
                 "criteria": ADVICE_CRITERIA,
             },
-            "complexity": {
-                "type": "choice",
-                "instructions": "How much evidence does the analyst question need?",
-                "criteria": COMPLEXITY_CRITERIA,
-            },
         },
     }
     started = time.perf_counter()
@@ -116,8 +104,6 @@ async def classify_question(question: str) -> RouteDecision:
         scope=answers["scope"]["choice"],
         scope_confidence=answers["scope"]["confidence"],
         advice_probability=answers["advice"]["noul"],
-        complexity=answers["complexity"]["choice"],
-        complexity_confidence=answers["complexity"]["confidence"],
         input_tokens=input_tokens,
         cost_usd=input_tokens * USD_PER_MILLION_INPUT_TOKENS / 1_000_000,
         seconds=time.perf_counter() - started,
@@ -134,9 +120,7 @@ def route(decision: RouteDecision, question: str) -> Route:
         and not partly_in_corpus
     ):
         return "out_of_corpus"
-    if decision.complexity == "simple" and decision.complexity_confidence >= SMALL_MODEL_CONFIDENCE:
-        return "agent_small"
-    return "agent_large"
+    return "agent"
 
 
 class RoutingResult(BaseModel):
@@ -148,9 +132,9 @@ class RoutingResult(BaseModel):
 async def decide_route(question: str) -> RoutingResult:
     """Never raises: without a key, or if Jev fails or is slow, the question goes to the agent."""
     if settings.typesafe_api_key is None:
-        return RoutingResult(route="agent_large", decision=None)
+        return RoutingResult(route="agent", decision=None)
     try:
         decision = await asyncio.wait_for(classify_question(question), settings.jev_router_timeout_seconds)
     except (httpx.HTTPError, TimeoutError, KeyError, ValueError) as exc:
-        return RoutingResult(route="agent_large", decision=None, error=f"{type(exc).__name__}: {exc}")
+        return RoutingResult(route="agent", decision=None, error=f"{type(exc).__name__}: {exc}")
     return RoutingResult(route=route(decision, question), decision=decision)

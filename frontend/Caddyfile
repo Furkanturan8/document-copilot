@@ -1,0 +1,28 @@
+{
+    admin off
+    persist_config off
+    auto_https off
+    log {
+        format json
+    }
+    servers {
+        trusted_proxies static private_ranges 100.0.0.0/8
+    }
+}
+
+:{$PORT:3000} {
+    # Before the SPA fallback, or the health check would get index.html.
+    @health path /health
+    handle @health {
+        respond "ok" 200
+    }
+
+    handle {
+        root * /srv
+        encode gzip
+
+        # Client-side routes (/chats/:id) load index.html and let React Router take over.
+        try_files {path} /index.html
+        file_server
+    }
+}
