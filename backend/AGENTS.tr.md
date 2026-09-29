@@ -37,15 +37,15 @@ backend/
 ├── app/
 │   ├── main.py          # FastAPI giriş noktası
 │   ├── config.py        # Pydantic settings — ortam değişkenleri için tek doğruluk kaynağı
-│   ├── api/             # FastAPI router'ları (chat, ingest, auth)
+│   ├── api/             # FastAPI router'ları (chat, auth)
 │   ├── auth/            # Supabase JWT doğrulama + mevcut kullanıcı dependency'si
 │   ├── chat/            # tur orkestrasyonu, AI SDK mesaj dönüşümü, streaming
-│   ├── assistant/       # PydanticAI agent, deps, çıktılar, talimatlar
+│   ├── assistant/       # PydanticAI agent, araçlar, deps, çıktılar, talimatlar, Jev soru yönlendiricisi
 │   ├── retrieval/       # pgvector/full-text sorguları, RRF birleştirme, kaynak pasaj arama
-│   ├── grounding/       # alıntı doğrulama ve yanıt dayanak (grounding) kontrolleri
-│   ├── database/        # SQLAlchemy modelleri, Supabase istemci sarmalayıcısı, tipli sorgu yardımcıları
-│   └── prompts/         # assistant ile birlikte tutulmuyorsa prompt/talimat şablonları
+│   ├── grounding/       # deterministik alıntı doğrulayıcı, sayısal kontroller, Jev risk sinyali (claims, judge, risk)
+│   └── database/        # SQLAlchemy modelleri, Supabase istemci sarmalayıcısı, tipli sorgu yardımcıları
 ├── ingest/              # tek seferlik ingestion script'leri (Markdown çıkarma, parçalama, embedding, Supabase yazmaları)
+├── scripts/             # smoke çalıştırmaları ve benchmark'lar (bilerek ücretli çağrılar, testlerde asla)
 ├── tests/
 └── pyproject.toml
 ```

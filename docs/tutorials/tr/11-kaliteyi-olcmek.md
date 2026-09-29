@@ -45,6 +45,18 @@ Her düzeltilen hata için bir test yazdık (`backend/tests/`). Bazı testlerin 
 
 `@pytest.mark.integration` ile işaretli testler gerçek veritabanı ve OpenAI ile çalışıyor. Örneğin "Apple FY2024'te net sales by category tablosu ilk 5 sonuçta mı?" Bunlar normal test çalıştırmasında atlanıyor (ağa çıkmasınlar ve ücret oluşturmasınlar diye), ayrıca `pytest -m integration` ile çalıştırılıyor.
 
+### 8. Bütçeli smoke çalıştırmaları ve benchmark'lar
+
+Cevap üretme aşamasında (Bölüm 12 ve 13) ölçüm ücretli hale geldi: her soru `gpt-5.5` ile $0,2–0,4 tutuyor. Bu yüzden ölçüm script'leri bilerek çalıştırılıyor, testlere hiç girmiyor ve bir bütçeyle korunuyor:
+
+| Script | Ne ölçüyor |
+|---|---|
+| `scripts/smoke_assistant.py --budget` | Müşteri brifi soruları uçtan uca: araç çağrıları, token, maliyet, süre, validator sonucu, alıntılar. Bütçe aşılınca bir sonraki soruya geçmeden duruyor |
+| `scripts/eval_judge.py` | Jev risk sinyali: sentetik negatiflerle (rakamı değiştirilmiş, yönü çevrilmiş, alakasız kaynak) doğru ve yanlış alarm oranları |
+| `scripts/eval_router.py` | Jev soru yönlendirmesi: etiketli sorularda korpus içi bir sorunun yanlışlıkla engellenip engellenmediği |
+
+İki alışkanlık burada da işe yaradı: pahalı bir çalıştırmadan önce iki soruluk bir **pilot** (tahminleri gerçek sayılarla kalibre etmek için) ve her reddedilen cevabı **kaynak metinle tek tek karşılaştırmak** (red doğru muydu, yoksa ölçüm aracının hatası mı?).
+
 ## 11.3 Bulduğumuz hatalar
 
 | Hata | Nasıl bulundu | Etkisi | Çözüm | Bölüm |
@@ -63,7 +75,18 @@ Her düzeltilen hata için bir test yazdık (`backend/tests/`). Bazı testlerin 
 | Tam metin araması sıfır sonuç | Soru başına isabet sayımı | Kelime araması devre dışı | VEYA + eşleşen terim sıralaması | 8 |
 | Link gürültüsü | Smoke testte `[Table of Contents](#…)` | Gürültülü sonuçlar | Linkleri metne indirgemek | 5 |
 
-Bu tablodaki hataların hiçbiri bir hata mesajıyla kendini göstermedi. Hepsi sayma, karşılaştırma ya da sonuçlara dikkatle bakma sayesinde bulundu.
+Cevap üretme aşamasında da aynı türden sessiz hatalar çıktı:
+
+| Hata | Nasıl bulundu | Etkisi | Çözüm | Bölüm |
+|---|---|---|---|---|
+| Okuma araçları metni 800 karakterde kesiyor | Chunk uzunluğu ölçümü (%70,7'si daha uzun) | Model görmediği metni alıntılayamaz | Okuma araçları tam metin döndürür | 12 |
+| Bölünmez tire (U+2011) doğru alıntıyı reddettiriyor | Başka bir modelle test, reddedilen alıntıyı kaynakla karşılaştırma | Doğru cevap hata olarak gösterilir | Tire türevleri normalleştirilir | 12 |
+| Tablo alıntısında ayırıcı satır farkı | Aynı yöntem | Doğru alıntı reddedilir | Tablo işaretleri karşılaştırmada yok sayılır | 12 |
+| Model uzun alıntının içinden cümle atıyor | 10 soruluk çalıştırmada her reddi kaynakla karşılaştırma | Cevap haklı olarak reddedilir | Talimat: kısa alıntı, atlama yok | 12 |
+| Yıl belirtilmemiş soruya eski yıl | Ucuz model ölçümü | Yanlış ama doğrulanmış görünen cevap | Talimat: en güncel yıl, söyleyerek | 12 |
+| Kısmen korpus içi soru engelleniyor | 48 soruluk yönlendirme benchmark'ı | Cevaplanabilir kısım reddedilir | Korpustaki şirket adı geçiyorsa engelleme yok | 13 |
+
+Bu tablolardaki hataların hiçbiri bir hata mesajıyla kendini göstermedi. Hepsi sayma, karşılaştırma ya da sonuçlara dikkatle bakma sayesinde bulundu.
 
 ## 11.4 İleri seviye: retrieval kalitesini sayıyla ölçmek
 
@@ -101,14 +124,14 @@ Bu, projemiz için mantıklı bir sonraki adım olabilir: bu kitapta yaptığım
 ## Özet
 
 - RAG hataları çoğunlukla sessizdir; ancak ölçerek bulunurlar.
-- Kapsam kontrolleri, dağılım istatistikleri, bağımsız doğrulama, testler ve smoke test birlikte kullanıldı; ölçüm araçlarının kendisi de doğrulandı.
-- Bu projede 13 önemli hata bulundu ve hiçbiri bir hata mesajı üretmedi.
+- Kapsam kontrolleri, dağılım istatistikleri, bağımsız doğrulama, testler, smoke testler ve bütçeli benchmark'lar birlikte kullanıldı; ölçüm araçlarının kendisi de doğrulandı.
+- Bu projede retrieval ve yükleme aşamasında 13, cevap üretme aşamasında 6 önemli hata bulundu; hiçbiri bir hata mesajı üretmedi.
 - Nicel değerlendirme için recall@k ve NDCG@10 kullanılır; kendi değerlendirme setini LLM ile üretmek ucuz ve etkili bir yöntem.
 
 ## Kaynaklar
 
 - Cookbook, NDCG açıklaması ve değerlendirme seti kurma rehberi: <https://github.com/daveebbelaar/ai-cookbook/tree/main/knowledge/hybrid-retrieval/docs>
-- Kod: `backend/tests/`, `backend/scripts/smoke_retrieval.py`
+- Kod: `backend/tests/`, `backend/scripts/smoke_retrieval.py`, `smoke_assistant.py`, `eval_judge.py`, `eval_router.py`
 
 ---
 [← Yükleme hattı ve veritabanı](10-yukleme-hatti-ve-veritabani.md) · Sonraki bölüm: [Cevap üretmek ve grounding →](12-cevap-uretmek-ve-grounding.md)

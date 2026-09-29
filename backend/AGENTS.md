@@ -35,15 +35,15 @@ backend/
 ├── app/
 │   ├── main.py          # FastAPI entrypoint
 │   ├── config.py        # Pydantic settings — single source of truth for env
-│   ├── api/             # FastAPI routers (chat, ingest, auth)
+│   ├── api/             # FastAPI routers (chat, auth)
 │   ├── auth/            # Supabase JWT verification + current user dependency
 │   ├── chat/            # turn orchestration, AI SDK message conversion, streaming
-│   ├── assistant/       # PydanticAI agent, deps, outputs, instructions
+│   ├── assistant/       # PydanticAI agent, tools, deps, outputs, instructions, Jev question router
 │   ├── retrieval/       # pgvector/full-text queries, RRF fusion, source passage lookup
-│   ├── grounding/       # citation validation and answer grounding checks
-│   ├── database/        # SQLAlchemy models, Supabase client wrapper, typed query helpers
-│   └── prompts/         # prompt/instruction templates if not colocated with assistant
+│   ├── grounding/       # deterministic citation validator, numeric checks, Jev risk signal (claims, judge, risk)
+│   └── database/        # SQLAlchemy models, Supabase client wrapper, typed query helpers
 ├── ingest/              # one-off ingestion scripts (Markdown extraction, chunking, embedding, Supabase writes)
+├── scripts/             # smoke runs and benchmarks (paid calls on purpose, never in tests)
 ├── tests/
 └── pyproject.toml
 ```

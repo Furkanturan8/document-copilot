@@ -27,6 +27,7 @@ flowchart LR
     end
 
     openai[OpenAI<br/>LLM + embedding]
+    jev[TypeSafe Jev<br/>soru yönlendirme + risk sinyali]
     corpus[SEC rapor külliyatı]
     ingestion[Ingestion hattı<br/>indir, parse et, parçala, embed et]
 
@@ -37,6 +38,7 @@ flowchart LR
     backend -->|kullanıcıyı doğrula| auth
     backend -->|pasajları getir<br/>sohbetleri + alıntıları kaydet| db
     backend -->|dayanaklı yanıt üret| openai
+    backend -->|soruyu sınıflandır<br/>iddiaları değerlendir| jev
     backend -->|yanıtı + alıntıları stream et| browser
 
     corpus --> ingestion
@@ -98,10 +100,12 @@ Supabase, kimlik doğrulamadan ve kalıcı ürün durumundan sorumludur. Tarayı
 4. Sohbet UI'ı, mesaj durumunu yönetmek ve yeni kullanıcı mesajlarını FastAPI sohbet endpoint'ine göndermek için Vercel AI SDK React primitive'lerini kullanır.
 5. Frontend, Supabase access token'ını `Authorization: Bearer <token>` olarak gönderir.
 6. FastAPI, herhangi bir retrieval veya LLM işi yapmadan önce token'ı Supabase Auth ile doğrular.
-7. FastAPI; kimliği doğrulanmış kullanıcıyı, sohbet thread'ini, Supabase istemcisini, retrieval servisini, alıntı politikasını ve LLM ayarlarını içeren istek kapsamlı bir bağlam oluşturur.
-8. Bir PydanticAI agent'ı ilgili doküman parçalarını getirir, dayanaklı bir yanıt üretir ve yanıt metni ile alıntıları içeren tipli bir çıktı döndürür.
-9. FastAPI, asistan mesaj parçalarını AI SDK istemcisinin beklediği formatta tarayıcıya stream eder.
-10. FastAPI; nihai kullanıcı mesajını, asistan mesajını, alıntılanan parçaları ve kullanım metadata'sını Supabase'e kaydeder.
+7. FastAPI, soruyu Jev'e (TypeSafe AI) sınıflandırtır: korpusun içinde mi dışında mı, yatırım tavsiyesi istiyor mu. Güvenle tavsiye ya da korpus dışı bulunan soru ajan çalışmadan sabit bir cevap alır; diğer her soru ve her yönlendirme hatası devam eder.
+8. Bir PydanticAI ajanı (`gpt-5.5`) araçlarla raporlarda arar (hibrit arama, tam chunk okuma) ve tipli bir `GroundedAnswer` döndürür: `[n]` işaretli metin ve birebir alıntılı atıflar.
+9. Deterministik validator, alıntıları bu turda getirilen chunk'lara karşı kontrol eder. Başarısız olursa tur kontrollü bir hatayla biter ve hiçbir şey kaydedilmez.
+10. Doğrulanmış cevap için sayısal kontroller ve Jev, iddia başına bir risk sinyali hesaplar (yalnızca telemetri).
+11. FastAPI; cevap metnini, alıntı parçalarını ve geçici bir risk parçasını AI SDK formatında stream eder.
+12. FastAPI; kullanıcı mesajını, asistan mesajını ve alıntı satırlarını Supabase'e kaydeder.
 
 ## Frontend Sohbet Katmanı
 
@@ -139,34 +143,47 @@ Tam API yüzeyi, uygulama sırasında kurulu AI SDK sürümüne göre doğrulanm
 
 PydanticAI, yanıt üretimi için backend'in orkestrasyon katmanı olarak kullanılmalıdır. Rastgele (ad hoc) prompt çağrılarını tipli bir agent sınırıyla değiştirir.
 
-Önerilen backend modülleri:
+Backend modülleri:
 
 ```text
 backend/app/
 ├── api/
-│   └── chat.py                 # Sohbet thread'leri ve streaming için FastAPI route'ları
+│   ├── auth.py                 # /auth/me
+│   └── chat.py                 # Thread route'ları ve streaming endpoint'i
 ├── auth/
-│   └── dependencies.py         # Supabase JWT doğrulama ve mevcut kullanıcı dependency'si
+│   └── dependencies.py         # Supabase JWT doğrulaması, geçerli kullanıcı
 ├── chat/
-│   ├── orchestrator.py         # Bir sohbet turunu uçtan uca koordine eder
-│   ├── messages.py             # AI SDK mesajlarını dahili mesaj tiplerine ve tersine dönüştürür
-│   └── streaming.py            # AI SDK uyumlu streaming olayları yayar
+│   ├── orchestrator.py         # Bir tur: yönlendirme → ajan → doğrulama → risk sinyali → stream → kayıt
+│   ├── messages.py             # AI SDK mesajları ↔ kayıtlı satırlar, alıntı parçaları
+│   └── streaming.py            # AI SDK UI message stream olayları (SSE)
 ├── assistant/
-│   ├── agent.py                # PydanticAI agent tanımı
-│   ├── deps.py                 # Agent için runtime bağımlılık dataclass'ı
-│   ├── outputs.py              # GroundedAnswer, Citation ve SourcePassage
-│   └── instructions.md         # Sistem talimatları ve ürün sözleşmesi
+│   ├── agent.py                # PydanticAI ajanı ve tur başına kullanım sınırları
+│   ├── tools.py                # search_filings, read_chunks, read_chunk, read_surrounding_chunks
+│   ├── deps.py                 # DocumentAgentDeps, TurnRegistry (alıntı izin listesi)
+│   ├── outputs.py              # GroundedAnswer, Citation
+│   ├── instructions.md         # Ürün sözleşmesi
+│   ├── router.py               # Jev ile soru yönlendirme: tavsiye ve korpus dışı sorular
+│   └── status.py, progress.py  # Arayüz ve smoke script'ler için durum olayları
 ├── retrieval/
-│   ├── queries.py              # pgvector ve full-text SQL sorguları
-│   ├── fusion.py               # Hibrit arama için Reciprocal Rank Fusion
-│   └── retriever.py            # Sorgudan kaynak pasaja retrieval mantığı
+│   ├── queries.py              # pgvector ve full-text SQL
+│   ├── keywords.py             # Full-text anahtar kelimeleri (küçük model)
+│   ├── embeddings.py           # Sorgu embedding'i
+│   ├── fusion.py               # Reciprocal Rank Fusion
+│   ├── retriever.py            # Sorgu → birleştirilmiş pasajlar + komşular
+│   └── types.py                # SearchFilters, RetrievedPassage, ajan formatı
 ├── grounding/
-│   └── validator.py            # Alıntıların getirilen pasajlarla eşleştiğini garanti eder
-└── database/
-    ├── supabase.py             # Supabase istemcisinin oluşturulması
-    ├── models.py               # Alembic autogenerate'in kullandığı SQLAlchemy tablo modelleri
-    ├── chats.py                # Sohbet, thread, mesaj ve alıntı kalıcılığı
-    └── documents.py            # Kaynak doküman, parça, embedding ve arama sorguları
+│   ├── validator.py            # Deterministik alıntı kontrolleri; fail closed
+│   ├── numeric.py              # Rakamların alıntılanan kaynaklara karşı kodla kontrolü
+│   ├── claims.py               # Cevap → iddialar (cümleler, tablo satırları)
+│   ├── judge.py                # Jev istekleri
+│   └── risk.py                 # Anlamsal risk sinyali; cevabı asla başarısız kılmaz
+├── database/
+│   ├── models/                 # SQLAlchemy modelleri, her tablo için bir dosya
+│   ├── session.py              # Engine ve session'lar (doğrudan Postgres)
+│   ├── supabase.py             # Supabase istemcileri
+│   ├── chats.py, users.py      # Thread, mesaj ve alıntı kaydı
+│   └── documents.py            # Retrieval ve araçlar için chunk sorguları
+└── config.py                   # Ayarlar, tek doğruluk kaynağı
 ```
 
 Bu isimler genel bir servis katmanı yerine ürün iş akışını takip etmelidir. `chat/orchestrator.py` tur yaşam döngüsünün tamamına, `assistant/agent.py` LLM sınırına, `retrieval/` hibrit kaynak pasaj aramasına, `grounding/` ise yanıtların getirilen kanıtlara atıf yapması gerektiği güven sözleşmesine sahiptir.
@@ -176,16 +193,17 @@ Agent, global'lere uzanmak yerine açık bağımlılıklar almalıdır:
 ```python
 @dataclass
 class DocumentAgentDeps:
-    user_id: str
-    thread_id: str
     retriever: DocumentRetriever
-    grounding_validator: GroundingValidator
+    registry: TurnRegistry            # bir aracın döndürdüğü her chunk: alıntı izin listesi
+    thread_id: UUID
+    user_id: UUID
+    on_status: StatusCallback | None = None
 
 
 class GroundedAnswer(BaseModel):
-    answer: str
-    citations: list[Citation]
-    cited_passages: list[SourcePassage]
+    answer: str                       # [n] işaretli metin
+    citations: list[Citation]         # citation_index, chunk_id, birebir alıntı
+    insufficient_evidence: bool = False
 ```
 
 Agent'ın talimatları ürün sözleşmesini kodlamalıdır:
@@ -283,7 +301,100 @@ Liste yanıtları çıplak dizi yerine adlandırılmış bir liste alanı olan n
 
 Supabase tabloları küçük ve ürün odaklı olmalıdır:
 
-- `profiles`: kimliği doğrulanmış her kullanıcı için bir satır, Supabase `auth.users.id` ile anahtarlanır.
+```mermaid
+erDiagram
+    users ||--o{ chat_threads : "sahibi (CASCADE)"
+    chat_threads ||--o{ chat_messages : "içerir (CASCADE)"
+    chat_messages ||--o{ message_citations : "alıntılar (CASCADE)"
+    document_chunks ||--o{ message_citations : "alıntılanır (RESTRICT)"
+    source_documents ||--o{ document_chunks : "bölünür (CASCADE)"
+    source_documents ||--o{ document_tables : "içerir (CASCADE)"
+    document_tables ||..o{ document_chunks : "satır chunk'ları (metadata.table_id)"
+
+    users {
+        uuid id PK "= auth.users.id"
+        varchar email UK
+        varchar display_name
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    chat_threads {
+        uuid id PK
+        uuid user_id FK
+        varchar title "default 'New chat'"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    chat_messages {
+        uuid id PK
+        uuid thread_id FK
+        varchar role "user | assistant | system"
+        varchar content
+        jsonb parts "AI SDK mesaj parçaları"
+        int sequence "thread içindeki sıra"
+        timestamptz created_at
+    }
+    message_citations {
+        uuid id PK
+        uuid message_id FK
+        uuid chunk_id FK
+        int citation_index
+        varchar excerpt
+        varchar ticker "raporun anlık kopyası"
+        varchar company_name
+        varchar filing_type
+        date filing_date
+        varchar page
+        varchar section
+        timestamptz created_at
+    }
+    source_documents {
+        uuid id PK
+        varchar ticker
+        varchar cik
+        varchar company_name
+        varchar filing_type
+        date filing_date
+        date report_date
+        int fiscal_year
+        varchar accession_number UK
+        varchar primary_document
+        varchar source_url
+        varchar content_markdown "Docling Markdown, deferred"
+        timestamptz ingested_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    document_chunks {
+        uuid id PK
+        uuid document_id FK
+        int chunk_index
+        varchar section
+        varchar page
+        varchar content
+        int token_count
+        vector embedding "1536 boyut, HNSW cosine"
+        tsvector search_vector "otomatik üretilir, GIN"
+        jsonb metadata "chunk_kind, table_id, ticker, ..."
+        timestamptz created_at
+    }
+    document_tables {
+        uuid id PK
+        uuid document_id FK
+        int table_index
+        varchar title
+        varchar units
+        varchar markdown
+        jsonb table_data
+        varchar source_html_hash "kaynak tablo HTML'inin hash'i"
+        timestamptz created_at
+    }
+```
+
+Diyagramın dışındaki kısıtlar ve index'ler: `document_chunks` üzerinde tekil `(document_id, chunk_index)`, `document_tables` üzerinde `(document_id, table_index)`, `chat_messages` üzerinde `(thread_id, sequence)` ve `message_citations` üzerinde `(message_id, citation_index)`; `document_chunks.embedding` üzerinde HNSW cosine index'i ve `search_vector` üzerinde GIN index'i; `source_documents` üzerinde `(ticker, fiscal_year)`. `alembic_version` güncel migration sürümünü tutar. Bir rapor silinince chunk'ları ve tabloları da silinir; kayıtlı bir cevabın alıntıladığı chunk silinemez (`RESTRICT`), bu yüzden alıntılanmış bir raporu yeniden yüklemek önce alıntıları siler (bkz. `ingest/chunk_and_embed.py`). Noktalı çizgi bir foreign key değil, JSON içindeki bir referanstır.
+
+
+- `users`: kimliği doğrulanmış her kullanıcı için bir satır, Supabase `auth.users.id` ile anahtarlanır.
 - `chat_threads`: thread metadata'sı, sahip, başlık, zaman damgaları.
 - `chat_messages`: sıralı kullanıcı ve asistan mesajları, faydalı olduğu yerde AI SDK uyumlu mesaj JSON'u ile.
 - `message_citations`: asistan mesajlarına bağlı normalize edilmiş alıntı kayıtları.
@@ -352,7 +463,9 @@ Backend şu değişmezleri (invariant) zorunlu kılmalıdır:
 
 Bu politika; retrieval, alıntı çıkarma ve grounding zorunluluğu etrafında backend birim testleriyle kapsanmalıdır.
 
-`grounding/validator.py` bunu LLM çağrısı olmadan, deterministik olarak uygular: her `[n]` işaretinin bir alıntıya karşılık gelmesi, her alıntının chunk'ının o turda bir araç tarafından döndürülmüş olması, her alıntı metninin (boşluk ve tipografi normalleştirilerek) o chunk'ta birebir geçmesi gerekir; hiç işaret olmayan bir satırdaki para tutarı ya da yüzde cevabı başarısız kılar. Alıntılanan chunk'ta bulunmayan bir rakam yalnızca uyarıdır, çünkü hesaplanmış ya da birimi dönüştürülmüş rakamlar meşrudur. Bu kontroller alıntı bütünlüğünü kanıtlar, alıntılanan metnin iddiayı anlamca desteklediğini değil; referans uygulama bunun için bir LLM hakemi ekler, bu proje onu deterministik katman gerçek cevaplarla ölçülene kadar erteler.
+`grounding/validator.py` bunu LLM çağrısı olmadan, deterministik olarak uygular: her `[n]` işaretinin bir alıntıya karşılık gelmesi, her alıntının chunk'ının o turda bir araç tarafından döndürülmüş olması, her alıntı metninin o chunk'ta birebir geçmesi gerekir; hiç işaret olmayan bir satırdaki para tutarı ya da yüzde cevabı başarısız kılar. Alıntılar kelime ve rakam düzeyinde karşılaştırılır; boşluk, tipografi (tırnaklar, tire türevleri) ve Markdown tablo işaretleri affedilir. Bir cevabın gösterilip gösterilmeyeceğine karar veren tek katman budur.
+
+Doğrulanmış cevaplarda iki katman daha çalışır ve hiçbiri cevabı başarısız kılmaz (`grounding/risk.py`). `grounding/numeric.py` her rakamı alıntılanan kaynaklara karşı kodla kontrol eder: birebir, birimi dönüştürülmüş (milyon cinsinden tabloda 24.967 için $25.0B) ya da pay, marj veya büyüme oranı olarak hesaplanmış. Ardından Jev her iddiayı (tüm alıntılarıyla bir cümle ya da tablo satırı) supported, contradicted ya da uncertain olarak, cevap başına tek bir toplu istekte değerlendirir. Sonuç, log'lar ve arayüz için iddia başına bir risk seviyesidir (yok, uyarı, yüksek); iddianın bütün rakamları kodla doğrulandıysa Jev'in şüphesi yok sayılır. Referans uygulama bunun yerine cevapları bir LLM hakemiyle engeller; bu korpusta ölçüldüğünde engelleyici bir anlamsal hakem, rakamları birimi dönüştürülmüş ya da hesaplanmış doğru cevapları reddetti; bu yüzden burada anlamsal kontrol bir kapı değil, bir sinyaldir. *(Karar: 2026-09-29.)*
 
 ## Hata Yönetimi
 
@@ -386,6 +499,8 @@ Backend ayarları:
 - `OPENAI_API_KEY`
 - `ALLOWED_ORIGINS`
 - embedding model adı ve boyutları
+- `OPENAI_CHAT_MODEL` (varsayılan `gpt-5.5`) ve tur başına ajan sınırları (`OPENAI_AGENT_*`: istek, araç çağrısı, token)
+- `TYPESAFE_API_KEY` (isteğe bağlı): Jev soru yönlendirmesi ve risk sinyali; yoksa ikisi de atlanır
 
 Ortam değişkenlerini component'lerden, route handler'lardan veya servislerden doğrudan okuma. Frontend kodu `src/lib/env.ts`, backend kodu `app/config.py` kullanmalıdır.
 
@@ -395,6 +510,8 @@ Railway iki servis çalıştırmalıdır:
 
 - Frontend: web uygulaması olarak sunulan statik Vite build'i.
 - Backend: Uvicorn çalıştıran FastAPI servisi.
+
+Her servis kendi Dockerfile'ından build edilir: `backend/Dockerfile` (yalnızca API; Docling ve korpus yükleme geliştirici makinelerinde kalır) ve `frontend/Dockerfile` (Caddy ile sunulan Vite build'i, `frontend/Caddyfile`). Adımlar: [docs/guides/railway-deployment.tr.md](guides/railway-deployment.tr.md).
 
 Supabase barındırılan olarak kalır ve kalıcı retrieval verisini saklar. Doküman parçaları, embedding'ler, full-text search vektörleri, sohbetler ve alıntıların tamamı Supabase Postgres'te yaşadığı için Railway backend'i durumsuz kalabilir. Ham indirilen raporlar, sonraki bir iş akışı bunları object storage'da saklamadıkça gitignore'daki yerel ingestion girdileri olarak kalır.
 

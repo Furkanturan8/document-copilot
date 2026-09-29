@@ -112,8 +112,8 @@ Kitabın geri kalanı bu sorunları tek tek ele alıyor.
 ## Kaynaklar
 
 - Lewis ve ark. (2020), *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks*: <https://arxiv.org/abs/2005.11401>
-- Proje mimarisi: [`docs/architecture.md`](../architecture.md)
-- Müşteri ihtiyaçları ve örnek sorular: [`docs/client-brief.md`](../client-brief.md)
+- Proje mimarisi: [`docs/architecture.tr.md`](../../architecture.tr.md)
+- Müşteri ihtiyaçları ve örnek sorular: [`docs/client-brief.tr.md`](../../client-brief.tr.md)
 
 ---
 Sonraki bölüm: [Kaynak veri: SEC 10-K raporları →](02-kaynak-veri.md)

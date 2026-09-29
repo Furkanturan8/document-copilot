@@ -62,29 +62,117 @@ Bir işlemi aynı girdiyle iki kez çalıştırdığında sonuç değişmiyorsa,
 - `--force`, bilerek yeniden üretmek için var; kod değiştiğinde kullanıyoruz.
 - `--dry-run`, ücretli çağrı ve veritabanı yazması yapmadan kaç chunk çıkacağını, token sınırını ve dağılımı gösteriyor. Pahalı bir işlemden önce "prova" yapmanın ucuz yolu.
 
-## 10.4 Veritabanı şeması (RAG kısmı)
+## 10.4 Veritabanı şeması
+
+Veritabanında iki grup tablo var: RAG tarafı (`source_documents`, `document_tables`, `document_chunks`) ve sohbet tarafı (`users`, `chat_threads`, `chat_messages`, `message_citations`). İki grubu birbirine bağlayan tek köprü `message_citations`: bir cevabın hangi chunk'ı alıntıladığını tutuyor.
 
 ```mermaid
 erDiagram
-    source_documents ||--o{ document_tables : "has"
-    source_documents ||--o{ document_chunks : "has"
-    document_tables ||--o{ document_chunks : "metadata.table_id"
-    document_chunks ||--o{ message_citations : "cited by"
-    chat_messages ||--o{ message_citations : "has"
+    users ||--o{ chat_threads : "sahibi (CASCADE)"
+    chat_threads ||--o{ chat_messages : "içerir (CASCADE)"
+    chat_messages ||--o{ message_citations : "alıntılar (CASCADE)"
+    document_chunks ||--o{ message_citations : "alıntılanır (RESTRICT)"
+    source_documents ||--o{ document_chunks : "bölünür (CASCADE)"
+    source_documents ||--o{ document_tables : "içerir (CASCADE)"
+    document_tables ||..o{ document_chunks : "satır chunk'ları (metadata.table_id)"
+
+    users {
+        uuid id PK "= auth.users.id"
+        varchar email UK
+        varchar display_name
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    chat_threads {
+        uuid id PK
+        uuid user_id FK
+        varchar title "default 'New chat'"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    chat_messages {
+        uuid id PK
+        uuid thread_id FK
+        varchar role "user | assistant | system"
+        varchar content
+        jsonb parts "AI SDK mesaj parçaları"
+        int sequence "thread içindeki sıra"
+        timestamptz created_at
+    }
+    message_citations {
+        uuid id PK
+        uuid message_id FK
+        uuid chunk_id FK
+        int citation_index
+        varchar excerpt
+        varchar ticker "raporun anlık kopyası"
+        varchar company_name
+        varchar filing_type
+        date filing_date
+        varchar page
+        varchar section
+        timestamptz created_at
+    }
+    source_documents {
+        uuid id PK
+        varchar ticker
+        varchar cik
+        varchar company_name
+        varchar filing_type
+        date filing_date
+        date report_date
+        int fiscal_year
+        varchar accession_number UK
+        varchar primary_document
+        varchar source_url
+        varchar content_markdown "Docling Markdown, deferred"
+        timestamptz ingested_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    document_chunks {
+        uuid id PK
+        uuid document_id FK
+        int chunk_index
+        varchar section
+        varchar page
+        varchar content
+        int token_count
+        vector embedding "1536 boyut, HNSW cosine"
+        tsvector search_vector "otomatik üretilir, GIN"
+        jsonb metadata "chunk_kind, table_id, ticker, ..."
+        timestamptz created_at
+    }
+    document_tables {
+        uuid id PK
+        uuid document_id FK
+        int table_index
+        varchar title
+        varchar units
+        varchar markdown
+        jsonb table_data
+        varchar source_html_hash "kaynak tablo HTML'inin hash'i"
+        timestamptz created_at
+    }
 ```
+
+Diyagramın dışındaki kısıtlar ve index'ler: `document_chunks` üzerinde tekil `(document_id, chunk_index)`, `document_tables` üzerinde `(document_id, table_index)`, `chat_messages` üzerinde `(thread_id, sequence)` ve `message_citations` üzerinde `(message_id, citation_index)`; `document_chunks.embedding` üzerinde HNSW cosine index'i ve `search_vector` üzerinde GIN index'i; `source_documents` üzerinde `(ticker, fiscal_year)`. `alembic_version` güncel migration sürümünü tutar. Bir rapor silinince chunk'ları ve tabloları da silinir; kayıtlı bir cevabın alıntıladığı chunk silinemez (`RESTRICT`), bu yüzden alıntılanmış bir raporu yeniden yüklemek önce alıntıları siler (bkz. `ingest/chunk_and_embed.py`). Noktalı çizgi bir foreign key değil, JSON içindeki bir referanstır.
 
 | Tablo | Ne tutar | Önemli sütunlar / index'ler |
 |---|---|---|
 | `source_documents` | Her 10-K | `accession_number` (tekil), `fiscal_year`, `content_markdown` (deferred), `ingested_at` |
 | `document_tables` | Temiz tablolar | `(document_id, table_index)` tekil, `table_data` JSON |
 | `document_chunks` | Aranabilir parçalar | `content`, `page`, `section`, `embedding vector(1536)` + **HNSW** index, `search_vector tsvector` (generated) + **GIN** index, `metadata` JSON |
-| `message_citations` | Cevaplardaki alıntılar | `chunk_id` (RESTRICT), alıntının metni ve belge bilgisinin kopyası |
+| `users` | Giriş yapan kullanıcılar | `id` = Supabase `auth.users.id`, `email` (tekil) |
+| `chat_threads` | Sohbetler | `user_id`, `title` (ilk sorudan üretilir), `updated_at` (kenar çubuğu sırası) |
+| `chat_messages` | Sıralı mesajlar | `(thread_id, sequence)` tekil, `role`, `parts` (AI SDK parçaları, alıntılar dahil) |
+| `message_citations` | Cevaplardaki alıntılar | `chunk_id` (RESTRICT), `(message_id, citation_index)` tekil, alıntının metni ve belge bilgisinin kopyası |
 
 `message_citations` alıntı yapılan metnin ve belge bilgisinin bir **kopyasını** saklıyor. Belgeler ileride yeniden chunk'lanırsa bile eski bir cevabın neye dayandığı doğrulanabilir kalıyor.
 
 Şema **Alembic migration'larıyla** yönetiliyor: SQLAlchemy modelleri tabloları tanımlıyor, migration'lar veritabanına uyguluyor. `create extension vector` ve RLS gibi otomatik üretilemeyen kısımlar elle ekleniyor.
 
-**Row Level Security (RLS):** Belge tabloları, giriş yapmış her kullanıcı tarafından okunabilir ama hiçbir kullanıcı tarafından yazılamaz. Yazmayı yalnızca, RLS'i atlayan doğrudan veritabanı bağlantısıyla çalışan yükleme hattı yapıyor.
+**Row Level Security (RLS):** Belge tabloları, giriş yapmış her kullanıcı tarafından okunabilir ama hiçbir kullanıcı tarafından yazılamaz. Yazmayı yalnızca, RLS'i atlayan doğrudan veritabanı bağlantısıyla çalışan yükleme hattı yapıyor. Sohbet tabloları ise yalnızca sahibine açık: bir kullanıcı yalnızca kendi thread'lerini, mesajlarını ve alıntılarını görebiliyor ve yazabiliyor.
 
 ## 10.5 Uzak veritabanıyla çalışmanın dersleri
 

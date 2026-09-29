@@ -31,7 +31,11 @@ document-copilot/
 ├── README.md           # bu dosya
 ├── data/               # yerel külliyat + indirme script'i (indirilen dosyalar gitignore'da)
 ├── docs/
-│   └── client-brief.md # müşteri tek sayfalık özeti
+│   ├── client-brief.md # müşteri tek sayfalık özeti
+│   ├── architecture.md # sistem tasarımı, veri modeli, grounding politikası
+│   ├── guides/         # Supabase, backend, frontend ve Railway kurulumu
+│   ├── todos.md        # fazlara göre yapım planı
+│   └── tutorials/      # kitap düzeninde RAG anlatımı (en/, tr/)
 ├── backend/            # FastAPI servisi
 └── frontend/           # React SPA (Vite)
 ```

@@ -25,6 +25,7 @@ flowchart LR
     end
 
     openai[OpenAI<br/>LLM + embeddings]
+    jev[TypeSafe Jev<br/>question routing + risk signal]
     corpus[SEC filing corpus]
     ingestion[Ingestion pipeline<br/>download, parse, chunk, embed]
 
@@ -35,6 +36,7 @@ flowchart LR
     backend -->|verify user| auth
     backend -->|retrieve passages<br/>persist chats + citations| db
     backend -->|generate grounded answer| openai
+    backend -->|classify question<br/>judge claims| jev
     backend -->|stream answer + citations| browser
 
     corpus --> ingestion
@@ -96,10 +98,12 @@ Supabase is responsible for authentication and durable product state. Browser ac
 4. The chat UI uses the Vercel AI SDK React primitives to manage message state and submit new user messages to the FastAPI chat endpoint.
 5. The frontend sends the Supabase access token as `Authorization: Bearer <token>`.
 6. FastAPI verifies the token with Supabase Auth before doing any retrieval or LLM work.
-7. FastAPI creates a request-scoped context containing the authenticated user, chat thread, Supabase client, retrieval service, citation policy, and LLM settings.
-8. A PydanticAI agent retrieves relevant document chunks, generates a grounded answer, and returns typed output containing answer text and citations.
-9. FastAPI streams assistant message parts back to the browser in the format expected by the AI SDK client.
-10. FastAPI persists the final user message, assistant message, cited chunks, and usage metadata to Supabase.
+7. FastAPI asks Jev (TypeSafe AI) to classify the question: in or out of the corpus, and whether it asks for investment advice. A confident advice or out-of-corpus question gets a fixed answer without an agent run; anything else, and any routing failure, goes on.
+8. A PydanticAI agent (`gpt-5.5`) searches the filings with tools (hybrid search, full-chunk reads) and returns a typed `GroundedAnswer`: text with `[n]` markers and citations with verbatim excerpts.
+9. The deterministic validator checks the citations against the chunks retrieved during the turn. On failure the turn ends with a controlled error and nothing is stored.
+10. For a validated answer, numeric checks and Jev compute a per-claim risk signal (telemetry only).
+11. FastAPI streams the answer text, citation parts and a transient risk part in the AI SDK format.
+12. FastAPI persists the user message, the assistant message and the citation rows to Supabase.
 
 ## Frontend Chat Layer
 
@@ -137,34 +141,47 @@ The exact API surface should be verified during implementation against the insta
 
 PydanticAI should be introduced as the backend's orchestration layer for answer generation. It replaces ad hoc prompt calls with a typed agent boundary.
 
-Recommended backend modules:
+Backend modules:
 
 ```text
 backend/app/
 ├── api/
-│   └── chat.py                 # FastAPI routes for chat threads and streaming
+│   ├── auth.py                 # /auth/me
+│   └── chat.py                 # Thread routes and the streaming endpoint
 ├── auth/
-│   └── dependencies.py         # Supabase JWT verification and current user dependency
+│   └── dependencies.py         # Supabase JWT verification, current user
 ├── chat/
-│   ├── orchestrator.py         # Coordinates one chat turn end-to-end
-│   ├── messages.py             # Converts AI SDK messages to and from internal message types
-│   └── streaming.py            # Emits AI SDK-compatible streaming events
+│   ├── orchestrator.py         # One turn: route → agent → validate → risk signal → stream → persist
+│   ├── messages.py             # AI SDK messages ↔ stored rows, citation parts
+│   └── streaming.py            # AI SDK UI message stream events (SSE)
 ├── assistant/
-│   ├── agent.py                # PydanticAI agent definition
-│   ├── deps.py                 # Runtime dependency dataclass for the agent
-│   ├── outputs.py              # GroundedAnswer, Citation, and SourcePassage
-│   └── instructions.md         # System instructions and product contract
+│   ├── agent.py                # PydanticAI agent and per-turn usage limits
+│   ├── tools.py                # search_filings, read_chunks, read_chunk, read_surrounding_chunks
+│   ├── deps.py                 # DocumentAgentDeps, TurnRegistry (the citation allowlist)
+│   ├── outputs.py              # GroundedAnswer, Citation
+│   ├── instructions.md         # Product contract
+│   ├── router.py               # Jev question routing: advice and out-of-corpus questions
+│   └── status.py, progress.py  # Status events for the UI and smoke scripts
 ├── retrieval/
-│   ├── queries.py              # pgvector and full-text SQL queries
-│   ├── fusion.py               # Reciprocal Rank Fusion for hybrid search
-│   └── retriever.py            # Query-to-source-passage retrieval logic
+│   ├── queries.py              # pgvector and full-text SQL
+│   ├── keywords.py             # Full-text keywords (small model)
+│   ├── embeddings.py           # Query embedding
+│   ├── fusion.py               # Reciprocal Rank Fusion
+│   ├── retriever.py            # Query → fused passages + neighbors
+│   └── types.py                # SearchFilters, RetrievedPassage, agent formatting
 ├── grounding/
-│   └── validator.py            # Ensures citations map to retrieved passages
-└── database/
-    ├── supabase.py             # Supabase client construction
-    ├── models.py               # SQLAlchemy table models used by Alembic autogenerate
-    ├── chats.py                # Chat, thread, message, and citation persistence
-    └── documents.py            # Source document, chunk, embedding, and search queries
+│   ├── validator.py            # Deterministic citation checks; fails closed
+│   ├── numeric.py              # Figures checked against the cited sources in code
+│   ├── claims.py               # Answer → claims (sentences, table rows)
+│   ├── judge.py                # Jev requests
+│   └── risk.py                 # Semantic risk signal; never fails an answer
+├── database/
+│   ├── models/                 # SQLAlchemy models, one file per table
+│   ├── session.py              # Engine and sessions (direct Postgres)
+│   ├── supabase.py             # Supabase clients
+│   ├── chats.py, users.py      # Thread, message and citation persistence
+│   └── documents.py            # Chunk lookups for retrieval and tools
+└── config.py                   # Settings, the single source of truth
 ```
 
 These names should follow the product workflow rather than a generic service layer. `chat/orchestrator.py` owns the full turn lifecycle, `assistant/agent.py` owns the LLM boundary, `retrieval/` owns hybrid source-passage search, and `grounding/` owns the trust contract that answers must cite retrieved evidence.
@@ -174,16 +191,17 @@ The agent should receive explicit dependencies rather than reaching into globals
 ```python
 @dataclass
 class DocumentAgentDeps:
-    user_id: str
-    thread_id: str
     retriever: DocumentRetriever
-    grounding_validator: GroundingValidator
+    registry: TurnRegistry            # every chunk a tool returned: the citation allowlist
+    thread_id: UUID
+    user_id: UUID
+    on_status: StatusCallback | None = None
 
 
 class GroundedAnswer(BaseModel):
-    answer: str
-    citations: list[Citation]
-    cited_passages: list[SourcePassage]
+    answer: str                       # text with [n] markers
+    citations: list[Citation]         # citation_index, chunk_id, verbatim excerpt
+    insufficient_evidence: bool = False
 ```
 
 The agent's instructions should encode the product contract:
@@ -281,7 +299,100 @@ List responses are objects with a named list field rather than bare arrays, so f
 
 Supabase tables should be small and product-oriented:
 
-- `profiles`: one row per authenticated user, keyed by Supabase `auth.users.id`.
+```mermaid
+erDiagram
+    users ||--o{ chat_threads : "owns (CASCADE)"
+    chat_threads ||--o{ chat_messages : "contains (CASCADE)"
+    chat_messages ||--o{ message_citations : "cites (CASCADE)"
+    document_chunks ||--o{ message_citations : "cited by (RESTRICT)"
+    source_documents ||--o{ document_chunks : "split into (CASCADE)"
+    source_documents ||--o{ document_tables : "has (CASCADE)"
+    document_tables ||..o{ document_chunks : "row chunks (metadata.table_id)"
+
+    users {
+        uuid id PK "= auth.users.id"
+        varchar email UK
+        varchar display_name
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    chat_threads {
+        uuid id PK
+        uuid user_id FK
+        varchar title "default 'New chat'"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    chat_messages {
+        uuid id PK
+        uuid thread_id FK
+        varchar role "user | assistant | system"
+        varchar content
+        jsonb parts "AI SDK message parts"
+        int sequence "order in thread"
+        timestamptz created_at
+    }
+    message_citations {
+        uuid id PK
+        uuid message_id FK
+        uuid chunk_id FK
+        int citation_index
+        varchar excerpt
+        varchar ticker "snapshot of the filing"
+        varchar company_name
+        varchar filing_type
+        date filing_date
+        varchar page
+        varchar section
+        timestamptz created_at
+    }
+    source_documents {
+        uuid id PK
+        varchar ticker
+        varchar cik
+        varchar company_name
+        varchar filing_type
+        date filing_date
+        date report_date
+        int fiscal_year
+        varchar accession_number UK
+        varchar primary_document
+        varchar source_url
+        varchar content_markdown "Docling Markdown, deferred"
+        timestamptz ingested_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    document_chunks {
+        uuid id PK
+        uuid document_id FK
+        int chunk_index
+        varchar section
+        varchar page
+        varchar content
+        int token_count
+        vector embedding "1536 dims, HNSW cosine"
+        tsvector search_vector "generated, GIN"
+        jsonb metadata "chunk_kind, table_id, ticker, ..."
+        timestamptz created_at
+    }
+    document_tables {
+        uuid id PK
+        uuid document_id FK
+        int table_index
+        varchar title
+        varchar units
+        varchar markdown
+        jsonb table_data
+        varchar source_html_hash "hash of the source table HTML"
+        timestamptz created_at
+    }
+```
+
+Constraints and indexes beyond the diagram: unique `(document_id, chunk_index)` on `document_chunks`, `(document_id, table_index)` on `document_tables`, `(thread_id, sequence)` on `chat_messages` and `(message_id, citation_index)` on `message_citations`; an HNSW cosine index on `document_chunks.embedding` and a GIN index on `search_vector`; `(ticker, fiscal_year)` on `source_documents`. `alembic_version` holds the current migration revision. Deleting a filing removes its chunks and tables; a chunk that a stored answer cites cannot be deleted (`RESTRICT`), so re-ingesting a cited filing first removes the citations (see `ingest/chunk_and_embed.py`). The dotted line is a JSON reference, not a foreign key.
+
+
+- `users`: one row per authenticated user, keyed by Supabase `auth.users.id`.
 - `chat_threads`: thread metadata, owner, title, timestamps.
 - `chat_messages`: user and assistant messages in order, with AI SDK-compatible message JSON where useful.
 - `message_citations`: normalized citation records linked to assistant messages.
@@ -350,7 +461,9 @@ The backend should enforce these invariants:
 
 This policy should be covered by backend unit tests around retrieval, citation extraction, and grounding enforcement.
 
-`grounding/validator.py` enforces this deterministically, with no LLM call: each `[n]` marker must match a citation, each citation's chunk must have been returned by a tool during the turn, each excerpt must appear verbatim (whitespace and typography normalized) in that chunk, and a money amount or percentage on a line without any marker fails the answer. A figure missing from its cited chunk is only a warning, since derived or converted figures are legitimate. These checks prove citation integrity, not that the cited text semantically supports the claim; the reference implementation adds an LLM judge for that, which this project defers until the deterministic layer has been measured on real answers.
+`grounding/validator.py` enforces this deterministically, with no LLM call: each `[n]` marker must match a citation, each citation's chunk must have been returned by a tool during the turn, each excerpt must appear verbatim in that chunk, and a money amount or percentage on a line without any marker fails the answer. Excerpts are compared on words and numbers, forgiving whitespace, typography (quotes, hyphen variants) and Markdown table markup. This is the only layer that decides whether an answer is shown.
+
+Two more layers run on validated answers and never fail one (`grounding/risk.py`). `grounding/numeric.py` checks each figure against the cited sources in code: exact, unit-converted ($25.0B for 24,967 in a millions table) or computed as a share, margin or growth rate. Jev then judges each claim, a sentence or table row with all its citations, as supported, contradicted or uncertain, in one batched request per answer. The result is a per-claim risk level (none, warning, high) for logs and the UI; Jev's doubt is ignored when code verified every figure of the claim. The reference implementation blocks answers on an LLM judge instead; measured on this corpus, a blocking semantic judge rejected correct answers whose figures were unit-converted or computed, so here the semantic check is a signal, not a gate. *(Decided 2026-09-29.)*
 
 ## Error Handling
 
@@ -384,6 +497,8 @@ Backend settings:
 - `OPENAI_API_KEY`
 - `ALLOWED_ORIGINS`
 - embedding model name and dimensions
+- `OPENAI_CHAT_MODEL` (default `gpt-5.5`) and the per-turn agent limits (`OPENAI_AGENT_*`: requests, tool calls, tokens)
+- `TYPESAFE_API_KEY` (optional): Jev question routing and risk signal; without it both are skipped
 
 Do not read environment variables directly from components, route handlers, or services. Frontend code should use `src/lib/env.ts`. Backend code should use `app/config.py`.
 
@@ -393,6 +508,8 @@ Railway should run two services:
 
 - Frontend: static Vite build served as a web app.
 - Backend: FastAPI service running Uvicorn.
+
+Each service builds from its own Dockerfile: `backend/Dockerfile` (the API only; Docling and ingestion stay on developer machines) and `frontend/Dockerfile` (Vite build served by Caddy, `frontend/Caddyfile`). Steps: [docs/guides/railway-deployment.md](guides/railway-deployment.md).
 
 Supabase remains hosted and stores the durable retrieval data. The Railway backend can stay stateless because document chunks, embeddings, full-text search vectors, chats, and citations all live in Supabase Postgres. Raw downloaded filings remain gitignored local ingestion inputs unless a later workflow stores them in object storage.
 
