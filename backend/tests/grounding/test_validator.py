@@ -65,6 +65,49 @@ def test_excerpt_matching_forgives_whitespace_quotes_dashes_and_cut_marks():
     assert validate_grounded_answer(answer, _registry(source)).ok
 
 
+def test_excerpt_matching_forgives_non_breaking_hyphens():
+    # Seen with gpt-oss: "AI-enabled" in the filing, "AI\u2011enabled" in the excerpt.
+    source = _passage("Startups use our platforms to build new generative and agentic AI-enabled products.")
+    answer = _answer(
+        "Startups build AI products [1].",
+        (1, source.chunk_id, "build new generative and agentic AI\u2011enabled products"),
+    )
+
+    assert validate_grounded_answer(answer, _registry(source)).ok
+
+
+def test_excerpt_stitched_from_separate_passages_fails():
+    # Also seen with gpt-oss: three sentences joined with an ellipsis into one "quote".
+    source = _passage("Trends put pressure on our margins. Other text here. AI could affect our monetization trends.")
+    answer = _answer(
+        "AI may pressure margins [1].",
+        (1, source.chunk_id, "put pressure on our margins. … AI could affect our monetization trends."),
+    )
+
+    assert _codes(validate_grounded_answer(answer, _registry(source))) == ["excerpt_not_in_chunk"]
+
+
+def test_table_excerpt_without_markdown_separator_row_passes():
+    # Seen with gpt-oss: the "|---|" row between header and data was dropped.
+    table = _passage(
+        "INCOME STATEMENTS | Year Ended June 30, | 2025 | 2024 | 2023 |\n|---|---|---|---|\n"
+        "| Gross margin | 193,893 | 171,008 | 146,052 |"
+    )
+    answer = _answer(
+        "Gross margin grew [1].",
+        (1, table.chunk_id, "Year Ended June 30, | 2025 | 2024 | 2023 | | Gross margin | 193,893 | 171,008 | 146,052"),
+    )
+
+    assert validate_grounded_answer(answer, _registry(table)).ok
+
+
+def test_table_excerpt_with_a_changed_number_still_fails():
+    table = _passage("| Gross margin | 193,893 | 171,008 |\n|---|---|---|")
+    answer = _answer("Gross margin grew [1].", (1, table.chunk_id, "Gross margin | 193,893 | 171,009"))
+
+    assert _codes(validate_grounded_answer(answer, _registry(table))) == ["excerpt_not_in_chunk"]
+
+
 def test_a_neighbor_returned_with_a_hit_is_citable():
     neighbor = _passage("Compute revenue grew as hyperscalers expanded capacity.")
     hit = _passage("Data Center overview.", neighbors=[neighbor])

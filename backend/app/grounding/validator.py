@@ -2,7 +2,8 @@
 
 Everything here is string and id matching: it proves citation integrity (every marker
 has a citation, every citation points at a chunk retrieved this turn, every excerpt is
-really in that chunk), not that the cited text semantically supports the claim.
+really in that chunk, compared on words and numbers rather than typography or table
+markup), not that the cited text semantically supports the claim.
 """
 
 import re
@@ -27,7 +28,26 @@ NUMBER_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 THOUSANDS_COMMA_RE = re.compile(r"(?<=\d),(?=\d{3}\b)")
 # Our search output marks cut excerpts with "..."; a model copying one keeps the dots.
 EDGE_ELLIPSIS_RE = re.compile(r"^(?:\.\.\.|…)\s*|\s*(?:\.\.\.|…)$")
-TYPOGRAPHY = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-"})
+# Models often write typographic variants the filings do not use: gpt-oss emits U+2011
+# (non-breaking hyphen) for every "-", which failed otherwise verbatim excerpts.
+TYPOGRAPHY = str.maketrans(
+    {
+        "‘": "'",
+        "’": "'",
+        "“": '"',
+        "”": '"',
+        "\u2010": "-",  # hyphen
+        "\u2011": "-",  # non-breaking hyphen
+        "\u2012": "-",  # figure dash
+        "–": "-",
+        "—": "-",
+        "\u2212": "-",  # minus sign
+    }
+)
+
+# Markdown table markup is presentation, not evidence: a model that drops the "|---|"
+# row or the pipes of a table row still quotes the same words and numbers in order.
+TABLE_SEPARATOR_RE = re.compile(r"\|?(?:\s*:?-{3,}:?\s*\|)+")
 
 MIN_EXCERPT_CHARS = 12  # shorter excerpts ("revenue", "2024") match almost any chunk
 
@@ -72,8 +92,14 @@ class ValidationResult(BaseModel):
 
 def normalize_text(text: str) -> str:
     """Forgive what copying can change without changing meaning: unicode forms, curly
-    quotes, en/em dashes and whitespace. Case, digits and words must match exactly."""
+    quotes, hyphen and dash variants, and whitespace. Case, digits and words must match exactly."""
     text = unicodedata.normalize("NFKC", text).translate(TYPOGRAPHY)
+    return " ".join(text.split())
+
+
+def comparable_text(text: str) -> str:
+    """normalize_text plus table markup removed; what excerpts and chunks are compared on."""
+    text = TABLE_SEPARATOR_RE.sub(" ", normalize_text(text)).replace("|", " ")
     return " ".join(text.split())
 
 
@@ -177,7 +203,7 @@ def _citation_issues(answer: GroundedAnswer, registry: TurnRegistry) -> list[Val
             )
             continue
 
-        excerpt = normalize_text(EDGE_ELLIPSIS_RE.sub("", citation.excerpt.strip()))
+        excerpt = comparable_text(EDGE_ELLIPSIS_RE.sub("", citation.excerpt.strip()))
         if len(excerpt) < MIN_EXCERPT_CHARS:
             issues.append(
                 ValidationIssue(
@@ -186,7 +212,7 @@ def _citation_issues(answer: GroundedAnswer, registry: TurnRegistry) -> list[Val
                     citation_index=index,
                 )
             )
-        elif excerpt not in normalize_text(passage.text):
+        elif excerpt not in comparable_text(passage.text):
             issues.append(
                 ValidationIssue(
                     code="excerpt_not_in_chunk",

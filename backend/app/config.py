@@ -20,7 +20,13 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
     openai_chat_model: str = "gpt-5.5"
-    openai_agent_request_limit: int = 20  # model requests per turn, tool rounds included
+    # Per-turn safety limits; a turn that hits one fails instead of running up cost.
+    openai_agent_request_limit: int = 20  # model requests, tool rounds included
+    openai_agent_tool_calls_limit: int = 15
+    openai_agent_total_tokens_limit: int = 100_000  # input + output, summed over requests
+    # Output costs 6x input on gpt-5.5, so it gets its own caps; reasoning tokens count too.
+    openai_agent_output_tokens_limit: int = 20_000  # summed over requests
+    openai_agent_max_tokens_per_response: int = 12_000
 
     # Hybrid retrieval tuning; see app/retrieval/README.md.
     retrieval_candidate_k: int = 50  # hits fetched from each search path before fusion

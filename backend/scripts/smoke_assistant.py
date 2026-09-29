@@ -102,6 +102,7 @@ def _record(number: int, question: str, outcome: TurnOutcome, wall_seconds: floa
         "citations": [
             {
                 "index": citation.citation_index,
+                "chunk_id": str(citation.chunk_id),
                 "ticker": passage.ticker,
                 "fiscal_year": passage.fiscal_year,
                 "page": passage.page,

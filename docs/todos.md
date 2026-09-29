@@ -149,9 +149,9 @@ Goal: grounded answers with enforced citations — the core product contract.
 - [X] Persist `message_citations` linked to assistant messages — rows built from the streamed `data-citation` parts
 - [X] Unit tests: citation validation, grounding enforcement, message conversion — `tests/grounding/`, `tests/chat/test_orchestrator.py`, `tests/assistant/`
 - [] Verify against [client-brief example questions](client-brief.md#example-analyst-questions):
-  - [] Answers cite specific filings and pages
+  - [X] Answers cite specific filings and pages — gpt-5.5, `scripts/smoke_assistant.py`: 6/10 client-brief answers pass validation with filing/page/section citations; Q3, Q7 rejected (model edited long excerpts), Q6, Q8 hit the 200K-token limit
   - [] Under-specified questions get "not enough evidence" responses
-  - [] Question 10 (generative AI margins) refuses to infer beyond filings
+  - [X] Question 10 (generative AI margins) refuses to infer beyond filings — presents the evidence and declines the causal claim
 
 ---
 

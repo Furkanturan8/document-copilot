@@ -43,7 +43,13 @@ async def run_document_agent(question: str, deps: DocumentAgentDeps) -> AgentRun
     result = await get_document_agent().run(
         question,
         deps=deps,
-        usage_limits=UsageLimits(request_limit=settings.openai_agent_request_limit),
+        usage_limits=UsageLimits(
+            request_limit=settings.openai_agent_request_limit,
+            tool_calls_limit=settings.openai_agent_tool_calls_limit,
+            total_tokens_limit=settings.openai_agent_total_tokens_limit,
+            output_tokens_limit=settings.openai_agent_output_tokens_limit,
+        ),
+        model_settings={"max_tokens": settings.openai_agent_max_tokens_per_response},
     )
     usage = result.usage
     emit_agent_done(
