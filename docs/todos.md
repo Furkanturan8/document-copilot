@@ -148,9 +148,9 @@ Goal: grounded answers with enforced citations — the core product contract.
 - [X] `chat/streaming.py` — AI SDK-compatible stream (text deltas + citation metadata parts): transient `data-status` parts while the agent runs, `data-citation` parts after the text
 - [X] Persist `message_citations` linked to assistant messages — rows built from the streamed `data-citation` parts
 - [X] Unit tests: citation validation, grounding enforcement, message conversion — `tests/grounding/`, `tests/chat/test_orchestrator.py`, `tests/assistant/`
-- [] Verify against [client-brief example questions](client-brief.md#example-analyst-questions):
+- [X] Verify against [client-brief example questions](client-brief.md#example-analyst-questions):
   - [X] Answers cite specific filings and pages — gpt-5.5, `scripts/smoke_assistant.py`: 6/10 client-brief answers pass validation with filing/page/section citations; Q3, Q7 rejected (model edited long excerpts), Q6, Q8 hit the 200K-token limit
-  - [] Under-specified questions get "not enough evidence" responses — instructions now say: no year → use the latest fiscal year and say so; not enough evidence → no citations. Jev routing turns away confident out-of-scope and advice questions. Needs one paid run to confirm
+  - [X] Under-specified questions get "not enough evidence" responses — "What were Apple's quarterly results for Q3 fiscal 2024?": insufficient evidence, no citations, names the missing 10-Q; "What's Apple's revenue?": uses FY2025 and says so; advice and out-of-scope questions are refused by Jev routing
   - [X] Question 10 (generative AI margins) refuses to infer beyond filings — presents the evidence and declines the causal claim
 
 ---
@@ -164,7 +164,7 @@ Goal: analysts can verify every claim in one click — this is what makes the pr
 - [X] Empty states (no threads, no corpus match) — `ChatEmptyPage`; no-evidence answers render as normal replies
 - [X] Error states (auth expired, retrieval failure, grounding failure, network/CORS) — `ChatError`, `lib/chat-errors.ts`
 - [X] Loading/streaming status during assistant run — transient `data-status` parts via `onData` → `PipelineStatus`
-- [] Verify: click a citation → see the exact passage from the filing
+- [X] Verify: click a citation → see the exact passage from the filing — checked in the app; a long section title overflowed the sheet and now wraps
 
 ---
 
@@ -175,7 +175,7 @@ Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per an
 - [X] README "Running locally" section — copy-paste commands for backend + frontend + env vars
 - [X] Seed or document how to ingest/update the corpus — README "Loading the corpus"
 - [] Smoke-test all 10 example questions from the client brief — last full run (before the excerpt-rule instructions): 6/10 pass; Q3, Q7 rejected for edited excerpts, Q6, Q8 hit the 200K-token limit. Rerun needs ~$3–4 of OpenAI credit
-- [] Confirm chat history persists across sessions
+- [X] Confirm chat history persists across sessions — checked by reloading the app: messages and citations remain
 - [] Confirm ~40-user scale assumptions (no hardcoded single-user shortcuts) — per-user auth and RLS, no single-user shortcuts. Limit: the default SQLAlchemy pool (5 + 10 overflow) makes turns wait for a connection beyond ~5–6 concurrent turns
 - [X] Basic structured logging on backend (`structlog`) for debugging failed turns — `question_routing`, `grounding_validation`, `grounding_risk`, `chat_turn_agent_failed`
 - [ ] Review latency: streaming starts within a few seconds for typical queries — status parts stream from the first second; the answer text arrives after 60–100 s with gpt-5.5; routed refusals under 1 s

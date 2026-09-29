@@ -85,9 +85,10 @@ Bu kitabın yazıldığı noktada projede şunlar tamamlandı:
 | Vektör arama | ✅ | 7 |
 | Tam metin arama | ✅ | 8 |
 | Hibrit arama (RRF) | ✅ | 9 |
-| LLM ile cevap üretme ve grounding | ⏳ Faz 6 | 12 |
+| LLM ile cevap üretme ve grounding | ✅ | 12 |
+| Jev ile soru yönlendirme ve risk sinyali | ✅ | 13 |
 
-Yani RAG'in "R"si (retrieval) bitti; "G"si (generation) sırada.
+Yani RAG'in hem "R"si (retrieval) hem "G"si (generation) kuruldu.
 
 ## 1.7 "Basit RAG" neden bizim için yetmedi?
 

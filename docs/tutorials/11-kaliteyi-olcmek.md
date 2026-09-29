@@ -111,4 +111,4 @@ Bu, projemiz için mantıklı bir sonraki adım olabilir: bu kitapta yaptığım
 - Kod: `backend/tests/`, `backend/scripts/smoke_retrieval.py`
 
 ---
-[← Yükleme hattı ve veritabanı](10-yukleme-hatti-ve-veritabani.md) · Sonraki bölüm: [Sıradaki adım: üretim ve grounding →](12-sonraki-adim-uretim-ve-grounding.md)
+[← Yükleme hattı ve veritabanı](10-yukleme-hatti-ve-veritabani.md) · Sonraki bölüm: [Cevap üretmek ve grounding →](12-cevap-uretmek-ve-grounding.md)

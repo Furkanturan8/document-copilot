@@ -19,7 +19,8 @@ Bölümler sırayla okunmak üzere yazıldı; her biri bir öncekinin üzerine k
 | 9 | [Hibrit arama ve RRF](09-hibrit-arama-ve-rrf.md) | İki aramayı birleştirmek, Reciprocal Rank Fusion, retriever'ın tamamı |
 | 10 | [Yükleme hattı ve veritabanı](10-yukleme-hatti-ve-veritabani.md) | Belgeden veritabanına uçtan uca akış, şema, performans dersleri |
 | 11 | [Kaliteyi ölçmek](11-kaliteyi-olcmek.md) | RAG'de "çalışıyor gibi"yi "çalışıyor"dan ayırmak, bulduğumuz hatalar |
-| 12 | [Sıradaki adım: cevap üretmek ve grounding](12-sonraki-adim-uretim-ve-grounding.md) | Arama sonuçlarından kaynak gösteren cevaba (Faz 6'nın önizlemesi) |
+| 12 | [Cevap üretmek ve grounding](12-cevap-uretmek-ve-grounding.md) | Ajan ve araçları, tipli cevap, deterministik validator, sayısal doğrulama, maliyetin anatomisi, ölçümler ve kör noktalar |
+| 13 | [Jev: tipli kararlar, risk sinyali ve soru yönlendirme](13-jev-tipli-kararlar.md) | Metin üretmeyen bir karar modeli: hakem denemesi, risk sinyali, soru yönlendirme, avantajlar ve sınırlar |
 | — | [Sözlük](sozluk.md) | Kitapta geçen terimlerin kısa açıklamaları |
 
 ## Kod haritası
@@ -44,6 +45,19 @@ backend/
     ├── fusion.py                # RRF                                    (Bölüm 9)
     ├── retriever.py             # Hepsini birleştiren orkestratör        (Bölüm 9)
     └── types.py                 # Filtreler, pasajlar, agent formatı     (Bölüm 9)
+backend/app/
+├── assistant/
+│   ├── agent.py                 # PydanticAI ajanı ve güvenlik limitleri (Bölüm 12)
+│   ├── tools.py                 # search_filings, read_chunks …          (Bölüm 12)
+│   ├── instructions.md          # Ürün sözleşmesi (talimatlar)           (Bölüm 12)
+│   └── router.py                # Jev ile soru yönlendirme               (Bölüm 13)
+├── grounding/
+│   ├── validator.py             # Deterministik alıntı doğrulaması       (Bölüm 12)
+│   ├── numeric.py               # Rakamların kodla doğrulanması          (Bölüm 12)
+│   ├── claims.py                # Cevap → iddialar                       (Bölüm 13)
+│   ├── judge.py                 # Jev istekleri                          (Bölüm 13)
+│   └── risk.py                  # Risk sinyali                           (Bölüm 13)
+└── chat/orchestrator.py         # Bir mesajın uçtan uca akışı            (Bölüm 12)
 ```
 
 ## Temel kaynaklar
@@ -61,6 +75,8 @@ Kitap boyunca atıf yapılan birincil kaynaklar:
   - Hibrit arama; BM25, embedding, RRF, reranking, NDCG ve değerlendirme seti kurma yazıları: <https://github.com/daveebbelaar/ai-cookbook/tree/main/knowledge/hybrid-retrieval>
   - Docling ile çıkarım, chunking, embedding ve arama: <https://github.com/daveebbelaar/ai-cookbook/tree/main/knowledge/docling>
   - Agentic RAG (araç kullanan ajan, alıntılı yapılandırılmış cevap): <https://github.com/daveebbelaar/ai-cookbook/tree/main/knowledge/agentic-rag>
+- PydanticAI (ajan, araçlar, yapılandırılmış çıktı): <https://ai.pydantic.dev/>
+- TypeSafe AI / Jev dokümantasyonu: <https://docs.typesafe.ai/introduction>
 
 ## Bu kitap nasıl okunmalı?
 
