@@ -37,7 +37,16 @@ export function SourcePassageSheet({ citation, onClose }: SourcePassageSheetProp
                 {citation.fiscalYear && <Badge variant="outline">FY {citation.fiscalYear}</Badge>}
                 <Badge variant="outline">Filed {citation.filingDate}</Badge>
                 {citation.page && <Badge variant="outline">Page {citation.page}</Badge>}
-                {citation.section && <Badge variant="outline">{citation.section}</Badge>}
+                {citation.section && (
+                  // Item titles run long ("Item 7. Management's Discussion and Analysis of ..."):
+                  // wrap inside the sheet instead of the badge's single nowrap line.
+                  <Badge
+                    variant="outline"
+                    className="h-auto max-w-full shrink justify-start rounded-lg text-left whitespace-normal"
+                  >
+                    {citation.section}
+                  </Badge>
+                )}
               </div>
             </SheetHeader>
 
