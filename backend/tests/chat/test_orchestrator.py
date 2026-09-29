@@ -5,14 +5,16 @@ from types import SimpleNamespace
 import anyio
 import anyio.lowlevel
 import httpx
+from pydantic import SecretStr
 from pydantic_ai.usage import RunUsage
 
 from app.assistant import router
 from app.assistant.outputs import Citation, GroundedAnswer
 from app.chat import orchestrator
-from app.config import settings
 from app.chat.messages import UIMessage
+from app.config import settings
 from app.database.chats import _citation_rows
+from app.grounding import risk
 from tests.assistant.test_tools import _passage
 
 THREAD = {"id": str(uuid.uuid4()), "user_id": str(uuid.uuid4()), "title": "New chat"}
@@ -201,8 +203,13 @@ def _route_to(monkeypatch, *, advice=0.0, complexity="complex", fail=False):
             seconds=0.1,
         )
 
-    monkeypatch.setattr(settings, "typesafe_api_key", "test-key")
+    async def offline_judge(claims, sources):
+        raise httpx.ConnectError("no network in tests")
+
+    monkeypatch.setattr(settings, "typesafe_api_key", SecretStr("test-key"))
     monkeypatch.setattr(router, "classify_question", classify)
+    # The risk signal runs after the agent too; keep it offline.
+    monkeypatch.setattr(risk, "judge_claims", offline_judge)
 
 
 def _deps() -> orchestrator.DocumentAgentDeps:

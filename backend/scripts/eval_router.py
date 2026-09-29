@@ -67,7 +67,7 @@ async def main() -> None:
             {
                 "question": question,
                 "expected": expected_route(scope, advice, complexity),
-                "routed": route(decision),
+                "routed": route(decision, question),
                 "label": {"scope": scope, "advice": advice, "complexity": complexity},
                 "decision": decision.model_dump(),
             }

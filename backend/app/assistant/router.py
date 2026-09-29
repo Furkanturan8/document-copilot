@@ -7,6 +7,7 @@ Measured with scripts/eval_router.py.
 """
 
 import asyncio
+import re
 import time
 from typing import Literal
 
@@ -45,6 +46,12 @@ ADVICE_CRITERIA = {
     "true": "Asks whether to buy, sell or hold a stock, which stock is the best investment, or for a price target",
     "false": "Asks what the filings say, even about risks, valuation inputs or shareholder returns",
 }
+# A question naming a corpus company is at least partly answerable ("Apple vs Samsung"),
+# so Jev's other_company verdict alone must not turn it away.
+CORPUS_COMPANY_RE = re.compile(
+    r"\b(?:apple|aapl|amazon|amzn|aws|nvidia|nvda|microsoft|msft|alphabet|google|googl|goog)\b",
+    re.IGNORECASE,
+)
 # Acting without the agent is only worth it when Jev is sure; everything else keeps today's path.
 SHORT_CIRCUIT_CONFIDENCE = 0.8
 SMALL_MODEL_CONFIDENCE = 0.8
@@ -117,10 +124,15 @@ async def classify_question(question: str) -> RouteDecision:
     )
 
 
-def route(decision: RouteDecision) -> Route:
+def route(decision: RouteDecision, question: str) -> Route:
     if decision.advice_probability >= SHORT_CIRCUIT_CONFIDENCE:
         return "refuse_advice"
-    if decision.scope != "in_corpus" and decision.scope_confidence >= SHORT_CIRCUIT_CONFIDENCE:
+    partly_in_corpus = decision.scope == "other_company" and CORPUS_COMPANY_RE.search(question)
+    if (
+        decision.scope != "in_corpus"
+        and decision.scope_confidence >= SHORT_CIRCUIT_CONFIDENCE
+        and not partly_in_corpus
+    ):
         return "out_of_corpus"
     if decision.complexity == "simple" and decision.complexity_confidence >= SMALL_MODEL_CONFIDENCE:
         return "agent_small"
@@ -141,4 +153,4 @@ async def decide_route(question: str) -> RoutingResult:
         decision = await asyncio.wait_for(classify_question(question), settings.jev_router_timeout_seconds)
     except (httpx.HTTPError, TimeoutError, KeyError, ValueError) as exc:
         return RoutingResult(route="agent_large", decision=None, error=f"{type(exc).__name__}: {exc}")
-    return RoutingResult(route=route(decision), decision=decision)
+    return RoutingResult(route=route(decision, question), decision=decision)
