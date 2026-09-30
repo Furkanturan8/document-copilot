@@ -29,7 +29,7 @@ function Header({ setLang }: { setLang: (l: Lang) => void }) {
   return (
     <header className="site-header">
       <div className="inner">
-        <a href="#top" className="brand"><span className="brand-mark" aria-hidden="true" /><span>Document Copilot</span></a>
+        <a href="#top" className="brand"><img className="brand-mark" src="favicon.svg" alt="" width="24" height="24" /><span>Document Copilot</span></a>
         <nav className="nav">
           <a href="#how">{t.nav.how}</a>
           <a href="#source">{t.nav.source}</a>
