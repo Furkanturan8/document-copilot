@@ -14,18 +14,15 @@ pnpm build     # output in dist/
 
 ## Media
 
-`public/media/` holds web-encoded copies of `docs/media/` (1440 px wide, no audio) with the test account's email masked by copying the empty sidebar strip above it over the account row:
+The Sessions carousel (section 07) does not play video: `src/AppReplay.tsx` rebuilds the app's chat screen and replays each recorded session from `src/replays.ts` (same questions, answers, status lines and citations as `docs/media/`). The videos only play in the "Watch the demo" modal.
+
+`public/media/` holds web-encoded copies of the three `docs/media/*.mp4` recordings (1440 px wide, no audio) with the test account's email masked by copying the empty sidebar strip above it over the account row:
 
 ```bash
-# videos (1920x936 source)
 ffmpeg -i docs/media/NAME.mp4 -an -filter_complex "[0]split[a][b];[b]crop=338:78:0:780[p];[a][p]overlay=0:858,scale=1440:-2" \
   -c:v libx264 -crf 26 -preset slow -pix_fmt yuv420p -movflags +faststart landing-page/public/media/NAME.mp4
-# stills (2880x1404 source)
-ffmpeg -i docs/media/NAME.png -filter_complex "[0]split[a][b];[b]crop=508:121:0:1160[p];[a][p]overlay=0:1283,scale=1440:-2" \
-  -q:v 3 landing-page/public/media/NAME.jpg
+ffmpeg -ss 1 -i landing-page/public/media/NAME.mp4 -frames:v 1 -q:v 3 landing-page/public/media/NAME.jpg   # poster
 ```
-
-Video posters are the frame at 1 s (`ffmpeg -ss 1 -i NAME.mp4 -frames:v 1 -q:v 3 NAME.jpg`).
 
 ## Content
 

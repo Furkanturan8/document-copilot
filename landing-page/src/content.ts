@@ -77,28 +77,24 @@ export const FYS = ['FY21', 'FY22', 'FY23', 'FY24', 'FY25']
 
 export const GITHUB_URL = 'https://github.com/Furkanturan8/document-copilot'
 
-const MEDIA_BASE = [
-  { file: 'demo-nvidia-gross-margin.mp4', video: true, dur: 27900 },
-  { file: 'demo-apple-net-sales-2024.mp4', video: true, dur: 23700 },
-  { file: 'demo-apple-latest-revenue.mp4', video: true, dur: 18100 },
-  { file: 'advice-and-out-of-corpus.png', video: false, dur: 7000 },
-  { file: 'share-price-out-of-corpus.png', video: false, dur: 7000 },
-  { file: 'insufficient-evidence.png', video: false, dur: 7000 },
+// Recording each carousel replay was rebuilt from (docs/media).
+const MEDIA_SOURCES = [
+  'demo-nvidia-gross-margin.mp4',
+  'demo-apple-net-sales-2024.mp4',
+  'demo-apple-latest-revenue.mp4',
+  'advice-and-out-of-corpus.png',
+  'share-price-out-of-corpus.png',
+  'insufficient-evidence.png',
 ]
 
-export interface MediaItem {
-  file: string; video: boolean; dur: number; src: string; poster: string; cap: string; title: string
+export interface MediaItem { file: string; cap: string; title: string }
+
+function media(caps: string[], titles: string[]): MediaItem[] {
+  return MEDIA_SOURCES.map((file, i) => ({ file, cap: caps[i], title: titles[i] }))
 }
 
 // Files in public/media are web-encoded copies of docs/media with the test account email masked.
-function media(caps: string[], titles: string[]): MediaItem[] {
-  return MEDIA_BASE.map((m, i) => {
-    const stem = m.file.replace(/\.\w+$/, '')
-    return { ...m, src: `media/${stem}.${m.video ? 'mp4' : 'jpg'}`, poster: `media/${stem}.jpg`, cap: caps[i], title: titles[i] }
-  })
-}
-
-export const DEMO_REELS = MEDIA_BASE.filter((m) => m.video).map((m) => `media/${m.file}`)
+export const DEMO_REELS = MEDIA_SOURCES.filter((f) => f.endsWith('.mp4')).map((f) => `media/${f}`)
 
 const en = {
   nav: { how: 'How it works', source: 'Open the source', jev: 'Jev', proof: 'Proof', github: 'GitHub' },
@@ -137,7 +133,7 @@ const en = {
   unknown: { k: '06 — Limits', title: "Knows what it can't answer.",
     body: "Quarterly figures aren't in a 10-K. Instead of inventing one, the assistant says the evidence is insufficient and shows no citations. It doesn't give investment advice either.",
     noSources: 'No sources shown' },
-  media: { k: '07 — Recordings', title: 'Real screen recordings.', body: 'Unedited captures of the running app. The test account email is masked.', left: 's left', video: 'Video', still: 'Screenshot', play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next',
+  media: { k: '07 — Sessions', title: 'Real sessions, replayed.', body: 'Six sessions from the running app, rebuilt from its screen recordings with the same questions and answers. The unedited videos are in the demo.', left: 's left', replay: 'Replay', from: 'Rebuilt from', watch: 'Watch the videos', play: 'Play', pause: 'Pause', prev: 'Previous', next: 'Next',
     demo: 'Demo · 3 recordings · ~70 s · silent', demoText: 'Three recordings: NVIDIA gross margin with the source panel opening; Apple fiscal 2024 net sales with the search status visible; Apple latest revenue using the most recent filing.',
     items: media(['Question, search status, cited answer, and the source panel opening.', 'The status line makes the search visible: ticker=AAPL, fiscal_years=[2024], form=10-K.', 'No year given, so it uses the latest filing and says so in the answer.', 'Routed by Jev: an advice refusal, and a company outside the sources (Tesla).', 'Routed by Jev: share prices are not in a 10-K.', 'Quarterly figures are not in the 10-Ks, so the assistant does not invent them.'], ['NVIDIA gross margin', 'Apple FY2024 sales', 'Apple latest revenue', 'Advice & Tesla', 'Share price', 'Insufficient evidence']) },
   proof: { k: '08 — Proof points', title: 'Measured, not rounded.', body: 'Values measured in the project. "~" marks an approximate or average value.',
@@ -214,7 +210,7 @@ const tr: Dict = {
   unknown: { k: '06 — Sınırlar', title: 'Neyi cevaplayamayacağını bilir.',
     body: 'Çeyreklik rakamlar 10-K raporlarında yer almaz. Asistan rakam uydurmak yerine kanıtın yetersiz olduğunu söyler ve kaynak göstermez. Yatırım tavsiyesi de vermez.',
     noSources: 'Kaynak gösterilmedi' },
-  media: { k: '07 — Kayıtlar', title: 'Gerçek ekran kayıtları.', body: 'Çalışan uygulamanın düzenlenmemiş kayıtları. Test hesabının e-postası gizlendi.', left: 'sn kaldı', video: 'Video', still: 'Ekran görüntüsü', play: 'Oynat', pause: 'Duraklat', prev: 'Önceki', next: 'Sonraki',
+  media: { k: '07 — Oturumlar', title: 'Gerçek oturumlar, yeniden oynatılıyor.', body: 'Çalışan uygulamadan altı oturum; ekran kayıtlarından aynı soru ve cevaplarla yeniden kuruldu. Düzenlenmemiş videolar demoda.', left: 'sn kaldı', replay: 'Canlandırma', from: 'Kaynak kayıt:', watch: 'Videoları izle', play: 'Oynat', pause: 'Duraklat', prev: 'Önceki', next: 'Sonraki',
     demo: 'Demo · 3 kayıt · ~70 sn · sessiz', demoText: 'Üç kayıt: kaynak paneli açılırken NVIDIA brüt kâr marjı; arama durumu görünürken Apple 2024 mali yılı net satışları; en güncel raporu kullanan Apple son gelir sorusu.',
     items: media(['Soru, arama durumu, kaynaklı cevap ve kaynak panelinin açılışı.', 'Durum satırı aramayı görünür kılar: ticker=AAPL, fiscal_years=[2024], form=10-K.', 'Yıl belirtilmediği için en güncel raporu kullanır ve bunu cevapta söyler.', 'Jev yönlendirdi: tavsiye reddi ve kaynak dışı bir şirket (Tesla).', 'Jev yönlendirdi: hisse fiyatları 10-K’da yer almaz.', 'Çeyreklik rakamlar 10-K’larda yok; asistan uydurmaz.'], ['NVIDIA brüt marj', 'Apple 2024 satışlar', 'Apple son gelir', 'Tavsiye & Tesla', 'Hisse fiyatı', 'Yetersiz kanıt']) },
   proof: { k: '08 — Kanıtlar', title: 'Ölçüldü, yuvarlanmadı.', body: 'Projede ölçülen değerler. "~" yaklaşık ya da ortalama değeri gösterir.',
